@@ -114,16 +114,20 @@ async def health():
 
 
 def generate_chat_response(messages, max_new_tokens, temperature, top_p, do_sample):
-    """Generate chat response using Qwen2.5"""
-    # Apply chat template
-    text = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
-    )
+    """Generate chat response using Qwen2.5
     
-    # Tokenize
-    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    Follows the official Qwen2.5 usage pattern:
+    - Uses apply_chat_template with tokenize=True, return_dict=True, return_tensors="pt"
+    - Extracts only newly generated tokens
+    """
+    # Apply chat template and tokenize in one step (as per Qwen2.5 docs)
+    model_inputs = tokenizer.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        return_tensors="pt"
+    ).to(model.device)
     
     # Generate
     with torch.no_grad():
@@ -136,14 +140,13 @@ def generate_chat_response(messages, max_new_tokens, temperature, top_p, do_samp
             pad_token_id=tokenizer.eos_token_id
         )
     
-    # Extract only the generated tokens (remove input)
-    generated_ids = [
-        output_ids[len(input_ids):] 
-        for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-    ]
+    # Extract only the newly generated tokens (remove input tokens)
+    # This matches the official Qwen2.5 example pattern
+    input_length = model_inputs["input_ids"].shape[-1]
+    generated_tokens = generated_ids[0][input_length:]
     
-    # Decode
-    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # Decode only the generated part
+    response = tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     return response
 
