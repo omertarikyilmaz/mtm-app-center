@@ -1,3 +1,7 @@
+# Use vLLM's official Docker image as base
+# v0.5.6 is the last version that supports CUDA 11.8
+# Note: vLLM official images use CUDA 12 by default, but we need CUDA 11.8
+# So we'll use the manual installation approach but with better structure
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
 # Set environment variables
@@ -30,10 +34,12 @@ RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1
 
 # Install vLLM 0.5.6 for CUDA 11.8 (0.6+ requires CUDA 12)
 # vLLM 0.5.6 is the last version that supports CUDA 11.8
+# Try installing from PyPI first, if that fails, try the wheel
 RUN pip3 install --no-cache-dir vllm==0.5.6 || \
-    (wget https://github.com/vllm-project/vllm/releases/download/v0.5.6/vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl && \
-     pip3 install vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl || \
-     echo "Note: vLLM wheel may need manual download")
+    (wget -q https://github.com/vllm-project/vllm/releases/download/v0.5.6/vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl && \
+     pip3 install --no-cache-dir vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl && \
+     rm -f vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl) || \
+    (echo "ERROR: vLLM installation failed. Please check CUDA compatibility." && exit 1)
 
 # Install flash-attn (requires CUDA toolkit for compilation)
 # Set CUDA_HOME for flash-attn build
@@ -45,6 +51,10 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 RUN pip3 install --no-cache-dir ninja packaging && \
     pip3 install --no-cache-dir flash-attn==2.4.2 --no-build-isolation || \
     echo "Warning: flash-attn installation failed, continuing without it"
+
+# Verify vLLM installation
+RUN python -c "import vllm; print(f'vLLM version: {vllm.__version__}')" || \
+    (echo "ERROR: vLLM import failed" && exit 1)
 
 # Install additional Python dependencies for DeepSeekOCR
 COPY requirements.txt .
@@ -65,4 +75,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Run the API server
 CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
-
