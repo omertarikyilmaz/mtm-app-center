@@ -22,14 +22,14 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python
 # Set working directory
 WORKDIR /app
 
-# Install PyTorch with CUDA 11.8 support
-RUN pip3 install --no-cache-dir torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
+# Install PyTorch 2.1+ with CUDA 11.8 support (vLLM 0.5.6 compatible)
+RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
 
-# Install vLLM 0.6.5 for CUDA 11.8 (0.8.5 requires CUDA 12)
-# vLLM 0.6.5 supports CUDA 11.8
-RUN pip3 install --no-cache-dir vllm==0.6.5 || \
-    (wget https://github.com/vllm-project/vllm/releases/download/v0.6.5/vllm-0.6.5+cu118-cp310-cp310-linux_x86_64.whl && \
-     pip3 install vllm-0.6.5+cu118-cp310-cp310-linux_x86_64.whl || \
+# Install vLLM 0.5.6 for CUDA 11.8 (0.6+ requires CUDA 12)
+# vLLM 0.5.6 is the last version that supports CUDA 11.8
+RUN pip3 install --no-cache-dir vllm==0.5.6 || \
+    (wget https://github.com/vllm-project/vllm/releases/download/v0.5.6/vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl && \
+     pip3 install vllm-0.5.6+cu118-cp310-cp310-linux_x86_64.whl || \
      echo "Note: vLLM wheel may need manual download")
 
 # Install flash-attn (requires CUDA toolkit for compilation)
@@ -38,8 +38,9 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 
+# Install flash-attn 2.4.x for vLLM 0.5.6 compatibility
 RUN pip3 install --no-cache-dir ninja packaging && \
-    pip3 install --no-cache-dir flash-attn==2.7.3 --no-build-isolation || \
+    pip3 install --no-cache-dir flash-attn==2.4.2 --no-build-isolation || \
     echo "Warning: flash-attn installation failed, continuing without it"
 
 # Copy requirements and install Python dependencies

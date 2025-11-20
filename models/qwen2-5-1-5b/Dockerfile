@@ -22,8 +22,8 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python
 # Set working directory
 WORKDIR /app
 
-# Install PyTorch with CUDA 11.8 support
-RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+# Install PyTorch 2.1+ with CUDA 11.8 support (transformers >=4.37 requires PyTorch >=2.1)
+RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
