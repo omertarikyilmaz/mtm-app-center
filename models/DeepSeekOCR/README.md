@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 # PyTorch ve vLLM'i CUDA desteği ile yükle
 pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
-pip install vllm-0.8.5+cu118-cp312-cp312-linux_x86_64.whl
+pip install vllm-0.8.5+cu118-cp310-cp310-linux_x86_64.whl
 pip install flash-attn==2.7.3 --no-build-isolation
 
 # Servisi başlat

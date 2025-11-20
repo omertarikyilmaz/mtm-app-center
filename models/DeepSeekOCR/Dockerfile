@@ -7,8 +7,8 @@ ENV CUDA_VISIBLE_DEVICES=0
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-dev \
+    python3.10 \
+    python3.10-dev \
     python3-pip \
     git \
     wget \
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create symlink for python
-RUN ln -s /usr/bin/python3.12 /usr/bin/python
+RUN ln -s /usr/bin/python3.10 /usr/bin/python
 
 # Set working directory
 WORKDIR /app
@@ -28,8 +28,8 @@ RUN pip3 install --no-cache-dir torch==2.6.0 torchvision==0.21.0 torchaudio==2.6
 # Install vLLM 0.8.5 for CUDA 11.8
 # Note: You may need to download the wheel file separately if not available via pip
 RUN pip3 install --no-cache-dir vllm==0.8.5 || \
-    (wget https://github.com/vllm-project/vllm/releases/download/v0.8.5/vllm-0.8.5+cu118-cp312-cp312-linux_x86_64.whl && \
-     pip3 install vllm-0.8.5+cu118-cp312-cp312-linux_x86_64.whl || \
+    (wget https://github.com/vllm-project/vllm/releases/download/v0.8.5/vllm-0.8.5+cu118-cp310-cp310-linux_x86_64.whl && \
+     pip3 install vllm-0.8.5+cu118-cp310-cp310-linux_x86_64.whl || \
      echo "Note: vLLM wheel may need manual download")
 
 # Install flash-attn
