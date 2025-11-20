@@ -1,5 +1,5 @@
 # Core dependencies
-transformers>=4.37.0  # Qwen2.5 requires >=4.37.0
+transformers>=4.37.0,<4.46.0  # Qwen2.5 requires >=4.37.0, but <4.46 for PyTorch 2.1.2 compatibility
 # torch is installed separately in Dockerfile with CUDA support
 accelerate>=0.20.0
 sentencepiece>=0.1.99
@@ -10,6 +10,6 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 
 # Additional utilities
-numpy
+numpy<2.0.0
 requests
 

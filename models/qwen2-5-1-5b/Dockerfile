@@ -22,6 +22,9 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python
 # Set working directory
 WORKDIR /app
 
+# Install NumPy 1.x first (required for PyTorch)
+RUN pip3 install --no-cache-dir "numpy<2.0.0"
+
 # Install PyTorch 2.1+ with CUDA 11.8 support (transformers >=4.37 requires PyTorch >=2.1)
 RUN pip3 install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
 

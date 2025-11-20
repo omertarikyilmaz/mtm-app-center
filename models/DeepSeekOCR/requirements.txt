@@ -7,7 +7,7 @@ einops
 easydict
 addict
 Pillow
-numpy
+numpy<2.0.0
 
 # FastAPI and server
 fastapi==0.104.1
