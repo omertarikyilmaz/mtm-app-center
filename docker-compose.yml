@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Ana docker-compose.yml - Tüm servisleri birlikte yönetir
 services:
   # DeepSeekOCR Service
@@ -102,6 +100,5 @@ services:
 networks:
   app-center-network:
     driver: bridge
-    name: app-center-network
-    # Network'ü external olarak işaretleme - otomatik oluşturulur
+    # Network otomatik oluşturulur, external değil
 
