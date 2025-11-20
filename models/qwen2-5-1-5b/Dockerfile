@@ -29,6 +29,9 @@ RUN pip3 install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Ensure PyTorch is properly installed
+RUN python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
+
 # Copy application code
 COPY . .
 

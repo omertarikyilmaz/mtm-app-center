@@ -25,11 +25,11 @@ WORKDIR /app
 # Install PyTorch with CUDA 11.8 support
 RUN pip3 install --no-cache-dir torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu118
 
-# Install vLLM 0.8.5 for CUDA 11.8
-# Note: You may need to download the wheel file separately if not available via pip
-RUN pip3 install --no-cache-dir vllm==0.8.5 || \
-    (wget https://github.com/vllm-project/vllm/releases/download/v0.8.5/vllm-0.8.5+cu118-cp310-cp310-linux_x86_64.whl && \
-     pip3 install vllm-0.8.5+cu118-cp310-cp310-linux_x86_64.whl || \
+# Install vLLM 0.6.5 for CUDA 11.8 (0.8.5 requires CUDA 12)
+# vLLM 0.6.5 supports CUDA 11.8
+RUN pip3 install --no-cache-dir vllm==0.6.5 || \
+    (wget https://github.com/vllm-project/vllm/releases/download/v0.6.5/vllm-0.6.5+cu118-cp310-cp310-linux_x86_64.whl && \
+     pip3 install vllm-0.6.5+cu118-cp310-cp310-linux_x86_64.whl || \
      echo "Note: vLLM wheel may need manual download")
 
 # Install flash-attn (requires CUDA toolkit for compilation)
