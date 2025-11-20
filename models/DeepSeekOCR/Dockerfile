@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -32,10 +32,15 @@ RUN pip3 install --no-cache-dir vllm==0.8.5 || \
      pip3 install vllm-0.8.5+cu118-cp310-cp310-linux_x86_64.whl || \
      echo "Note: vLLM wheel may need manual download")
 
-# Install flash-attn
-RUN pip3 install --no-cache-dir flash-attn==2.7.3 --no-build-isolation || \
-    (pip3 install --no-cache-dir ninja && \
-     pip3 install --no-cache-dir flash-attn==2.7.3 --no-build-isolation)
+# Install flash-attn (requires CUDA toolkit for compilation)
+# Set CUDA_HOME for flash-attn build
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+RUN pip3 install --no-cache-dir ninja packaging && \
+    pip3 install --no-cache-dir flash-attn==2.7.3 --no-build-isolation || \
+    echo "Warning: flash-attn installation failed, continuing without it"
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
