@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTM App Center</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .tab-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .tab-button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .file-upload {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+
+        .file-upload:hover {
+            background: #f0f2ff;
+            border-color: #764ba2;
+        }
+
+        .file-upload.dragover {
+            background: #e8ebff;
+            border-color: #764ba2;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .response-area {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            min-height: 100px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .response-area.empty {
+            color: #999;
+            font-style: italic;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #c33;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #3c3;
+        }
+
+        .chat-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: 20%;
+        }
+
+        .message.assistant {
+            background: #e0e0e0;
+            color: #333;
+            margin-right: 20%;
+        }
+
+        .message-header {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .health-status {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-badge.healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.unhealthy {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.unreachable {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .file-list {
+            margin-top: 15px;
+        }
+
+        .file-item {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item button {
+            padding: 6px 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 MTM App Center</h1>
+            <p>DeepSeekOCR, Qwen2.5 ve İflas Pipeline Servisleri</p>
+        </div>
+
+        <div class="health-status" id="healthStatus">
+            <span class="status-badge unreachable">DeepSeekOCR: Kontrol ediliyor...</span>
+            <span class="status-badge unreachable">Qwen2.5: Kontrol ediliyor...</span>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('chat')">💬 Qwen Chat</button>
+            <button class="tab-button" onclick="switchTab('ocr')">📄 DeepSeekOCR</button>
+            <button class="tab-button" onclick="switchTab('iflas')">📋 İflas Pipeline</button>
+        </div>
+
+        <!-- Chat Tab -->
+        <div id="chatTab" class="tab-content active">
+            <h2>Qwen2.5-1.5B Chat</h2>
+            <div class="form-group">
+                <label>Sistem Prompt (Opsiyonel)</label>
+                <input type="text" id="systemPrompt" placeholder="Örn: Sen yardımcı bir asistansın.">
+            </div>
+            <div class="form-group">
+                <label>Mesajınız</label>
+                <textarea id="chatMessage" placeholder="Mesajınızı yazın..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Max Tokens</label>
+                <input type="number" id="maxTokens" value="512" min="1" max="8192">
+            </div>
+            <div class="form-group">
+                <label>Temperature</label>
+                <input type="number" id="temperature" value="0.6" min="0" max="2" step="0.1">
+            </div>
+            <button class="btn" onclick="sendChat()">Gönder</button>
+            <div class="loading" id="chatLoading">
+                <div class="spinner"></div>
+                <p>Mesaj gönderiliyor...</p>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div id="chatError"></div>
+        </div>
+
+        <!-- OCR Tab -->
+        <div id="ocrTab" class="tab-content">
+            <h2>DeepSeekOCR - Görsel Okuma</h2>
+            <div class="form-group">
+                <label>Görsel Yükle</label>
+                <div class="file-upload" id="ocrUpload" onclick="document.getElementById('ocrFile').click()">
+                    <p>📁 Görseli buraya sürükleyin veya tıklayın</p>
+                    <input type="file" id="ocrFile" accept="image/*" onchange="handleOCRFileSelect(event)">
+                    <div class="file-info" id="ocrFileInfo"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Prompt (Opsiyonel)</label>
+                <input type="text" id="ocrPrompt" placeholder="Varsayılan: &lt;image&gt;\nFree OCR.">
+            </div>
+            <button class="btn" onclick="processOCR()">OCR İşle</button>
+            <div class="loading" id="ocrLoading">
+                <div class="spinner"></div>
+                <p>Görsel işleniyor...</p>
+            </div>
+            <div class="response-area empty" id="ocrResponse">OCR sonucu burada görünecek...</div>
+            <div id="ocrError"></div>
+        </div>
+
+        <!-- İflas Pipeline Tab -->
+        <div id="iflasTab" class="tab-content">
+            <h2>İflas/İcra İlanı İşleme</h2>
+            <div class="form-group">
+                <label>Görsel Yükle</label>
+                <div class="file-upload" id="iflasUpload" onclick="document.getElementById('iflasFile').click()">
+                    <p>📁 İlan görselini buraya sürükleyin veya tıklayın</p>
+                    <input type="file" id="iflasFile" accept="image/*" onchange="handleIflasFileSelect(event)">
+                    <div class="file-info" id="iflasFileInfo"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Toplu İşleme (Birden fazla görsel)</label>
+                <div class="file-upload" id="iflasBatchUpload" onclick="document.getElementById('iflasBatchFiles').click()">
+                    <p>📁 Birden fazla görsel seçin</p>
+                    <input type="file" id="iflasBatchFiles" accept="image/*" multiple onchange="handleIflasBatchSelect(event)">
+                    <div class="file-list" id="iflasBatchFileList"></div>
+                </div>
+            </div>
+            <button class="btn" onclick="processIflas()">İşle ve JSON Göster</button>
+            <button class="btn btn-secondary" onclick="processIflasCSV()" style="margin-top: 10px;">İşle ve CSV İndir</button>
+            <div class="loading" id="iflasLoading">
+                <div class="spinner"></div>
+                <p>İlan işleniyor...</p>
+            </div>
+            <div class="response-area empty" id="iflasResponse">İşlem sonucu burada görünecek...</div>
+            <div id="iflasError"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedOCRFile = null;
+        let selectedIflasFile = null;
+        let selectedIflasBatchFiles = [];
+
+        // Health check on load
+        checkHealth();
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('healthStatus');
+                statusDiv.innerHTML = '';
+                
+                const deepseekStatus = data.services.deepseek_ocr.status;
+                const qwenStatus = data.services.qwen.status;
+                
+                statusDiv.innerHTML = `
+                    <span class="status-badge ${deepseekStatus === 'healthy' ? 'healthy' : 'unhealthy'}">
+                        DeepSeekOCR: ${deepseekStatus === 'healthy' ? 'Çalışıyor' : 'Erişilemiyor'}
+                    </span>
+                    <span class="status-badge ${qwenStatus === 'healthy' ? 'healthy' : 'unhealthy'}">
+                        Qwen2.5: ${qwenStatus === 'healthy' ? 'Çalışıyor' : 'Erişilemiyor'}
+                    </span>
+                `;
+            } catch (error) {
+                console.error('Health check error:', error);
+            }
+        }
+
+        // Chat functions
+        async function sendChat() {
+            const message = document.getElementById('chatMessage').value.trim();
+            if (!message) {
+                showError('chatError', 'Lütfen bir mesaj yazın');
+                return;
+            }
+
+            const loading = document.getElementById('chatLoading');
+            const errorDiv = document.getElementById('chatError');
+            errorDiv.innerHTML = '';
+            loading.classList.add('active');
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        system_prompt: document.getElementById('systemPrompt').value || null,
+                        max_new_tokens: parseInt(document.getElementById('maxTokens').value),
+                        temperature: parseFloat(document.getElementById('temperature').value),
+                        top_p: 0.9
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Chat hatası');
+                }
+
+                const data = await response.json();
+                
+                // Add messages to chat
+                addChatMessage('user', message);
+                addChatMessage('assistant', data.response);
+                
+                // Clear input
+                document.getElementById('chatMessage').value = '';
+            } catch (error) {
+                showError('chatError', error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        function addChatMessage(role, content) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            messageDiv.innerHTML = `
+                <div class="message-header">${role === 'user' ? 'Kullanıcı' : 'Qwen2.5'}</div>
+                <div>${content}</div>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // OCR functions
+        function handleOCRFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedOCRFile = file;
+                document.getElementById('ocrFileInfo').textContent = `Seçilen: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+            }
+        }
+
+        async function processOCR() {
+            if (!selectedOCRFile) {
+                showError('ocrError', 'Lütfen bir görsel seçin');
+                return;
+            }
+
+            const loading = document.getElementById('ocrLoading');
+            const errorDiv = document.getElementById('ocrError');
+            const responseDiv = document.getElementById('ocrResponse');
+            errorDiv.innerHTML = '';
+            loading.classList.add('active');
+            responseDiv.classList.add('empty');
+            responseDiv.textContent = '';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedOCRFile);
+                const prompt = document.getElementById('ocrPrompt').value;
+                if (prompt) {
+                    formData.append('prompt', prompt);
+                }
+
+                const response = await fetch('/api/ocr', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'OCR hatası');
+                }
+
+                const data = await response.json();
+                responseDiv.textContent = data.text || 'Sonuç bulunamadı';
+                responseDiv.classList.remove('empty');
+            } catch (error) {
+                showError('ocrError', error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        // İflas Pipeline functions
+        function handleIflasFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedIflasFile = file;
+                document.getElementById('iflasFileInfo').textContent = `Seçilen: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+            }
+        }
+
+        function handleIflasBatchSelect(event) {
+            selectedIflasBatchFiles = Array.from(event.target.files);
+            const fileListDiv = document.getElementById('iflasBatchFileList');
+            fileListDiv.innerHTML = '';
+            
+            selectedİflasBatchFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span>${file.name} (${(file.size / 1024).toFixed(2)} KB)</span>
+                    <button onclick="removeBatchFile(${index})">Kaldır</button>
+                `;
+                fileListDiv.appendChild(fileItem);
+            });
+        }
+
+        function removeBatchFile(index) {
+            selectedIflasBatchFiles.splice(index, 1);
+            handleIflasBatchSelect({target: {files: selectedIflasBatchFiles}});
+        }
+
+        async function processIflas() {
+            if (!selectedIflasFile && selectedIflasBatchFiles.length === 0) {
+                showError('iflasError', 'Lütfen bir görsel seçin');
+                return;
+            }
+
+            const loading = document.getElementById('iflasLoading');
+            const errorDiv = document.getElementById('iflasError');
+            const responseDiv = document.getElementById('iflasResponse');
+            errorDiv.innerHTML = '';
+            loading.classList.add('active');
+            responseDiv.classList.add('empty');
+            responseDiv.textContent = '';
+
+            try {
+                if (selectedIflasFile) {
+                    // Single file
+                    const formData = new FormData();
+                    formData.append('file', selectedIflasFile);
+
+                    const response = await fetch('/api/iflas/process', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'İflas pipeline hatası');
+                    }
+
+                    const data = await response.json();
+                    responseDiv.textContent = JSON.stringify(data.data, null, 2);
+                    responseDiv.classList.remove('empty');
+                }
+            } catch (error) {
+                showError('iflasError', error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
+        }
+
+        async function processIflasCSV() {
+            if (selectedIflasBatchFiles.length > 0) {
+                // Batch processing
+                const formData = new FormData();
+                selectedIflasBatchFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const loading = document.getElementById('iflasLoading');
+                const errorDiv = document.getElementById('iflasError');
+                errorDiv.innerHTML = '';
+                loading.classList.add('active');
+
+                try {
+                    const response = await fetch('/api/iflas/batch-process', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Batch işleme hatası');
+                    }
+
+                    // Download CSV
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'batch_output.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    showSuccess('iflasError', 'CSV dosyası indirildi!');
+                } catch (error) {
+                    showError('iflasError', error.message);
+                } finally {
+                    loading.classList.remove('active');
+                }
+            } else if (selectedIflasFile) {
+                // Single file
+                const formData = new FormData();
+                formData.append('file', selectedIflasFile);
+
+                const loading = document.getElementById('iflasLoading');
+                const errorDiv = document.getElementById('iflasError');
+                errorDiv.innerHTML = '';
+                loading.classList.add('active');
+
+                try {
+                    const response = await fetch('/api/iflas/process-and-csv', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'İflas pipeline hatası');
+                    }
+
+                    // Download CSV
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filename = contentDisposition 
+                        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+                        : 'output.csv';
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    showSuccess('iflasError', 'CSV dosyası indirildi!');
+                } catch (error) {
+                    showError('iflasError', error.message);
+                } finally {
+                    loading.classList.remove('active');
+                }
+            } else {
+                showError('iflasError', 'Lütfen bir görsel seçin');
+            }
+        }
+
+        function showError(elementId, message) {
+            const errorDiv = document.getElementById(elementId);
+            errorDiv.innerHTML = `<div class="error">❌ ${message}</div>`;
+        }
+
+        function showSuccess(elementId, message) {
+            const errorDiv = document.getElementById(elementId);
+            errorDiv.innerHTML = `<div class="success">✅ ${message}</div>`;
+        }
+
+        // Drag and drop
+        ['ocrUpload', 'iflasUpload'].forEach(id => {
+            const element = document.getElementById(id);
+            element.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                element.classList.add('dragover');
+            });
+            element.addEventListener('dragleave', () => {
+                element.classList.remove('dragover');
+            });
+            element.addEventListener('drop', (e) => {
+                e.preventDefault();
+                element.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    if (id === 'ocrUpload') {
+                        document.getElementById('ocrFile').files = files;
+                        handleOCRFileSelect({target: {files: files}});
+                    } else {
+                        document.getElementById('iflasFile').files = files;
+                        handleIflasFileSelect({target: {files: files}});
+                    }
+                }
+            });
+        });
+
+        // Enter key for chat
+        document.getElementById('chatMessage').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                sendChat();
+            }
+        });
+    </script>
+</body>
+</html>
+

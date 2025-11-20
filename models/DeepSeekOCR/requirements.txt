@@ -1,0 +1,30 @@
+# Core dependencies
+transformers==4.46.3
+tokenizers==0.20.3
+PyMuPDF
+img2pdf
+einops
+easydict
+addict
+Pillow
+numpy
+
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.0
+
+# PyTorch (will be installed separately in Dockerfile with CUDA support)
+# torch==2.6.0
+# torchvision==0.21.0
+# torchaudio==2.6.0
+
+# vLLM (will be installed separately in Dockerfile)
+# vllm-0.8.5+cu118
+
+# Flash attention (will be installed separately in Dockerfile)
+# flash-attn==2.7.3
+
+# Additional utilities
+tqdm

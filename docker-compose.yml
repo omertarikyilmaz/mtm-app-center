@@ -1,0 +1,107 @@
+version: '3.8'
+
+# Ana docker-compose.yml - Tüm servisleri birlikte yönetir
+services:
+  # DeepSeekOCR Service
+  deepseek-ocr:
+    build:
+      context: ./models/DeepSeekOCR
+      dockerfile: Dockerfile
+    container_name: deepseek-ocr-api
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=${DEEPSEEK_OCR_MODEL_PATH:-deepseek-ai/DeepSeek-OCR}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount model cache if using local models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      # Optional: mount input/output directories
+      - ./models/DeepSeekOCR/data/input:/app/data/input:ro
+      - ./models/DeepSeekOCR/data/output:/app/data/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - app-center-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # Qwen2.5-1.5B-Instruct Service
+  qwen2-5-1-5b:
+    build:
+      context: ./models/qwen2-5-1-5b
+      dockerfile: Dockerfile
+    container_name: qwen2-5-1-5b-api
+    ports:
+      - "8001:8001"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=${QWEN_MODEL_PATH:-Qwen/Qwen2.5-1.5B-Instruct}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount model cache if using local models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - app-center-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    depends_on:
+      - deepseek-ocr
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend-api
+    ports:
+      - "8080:8080"
+    environment:
+      - DEEPSEEK_OCR_URL=http://deepseek-ocr:8000
+      - QWEN_API_URL=http://qwen2-5-1-5b:8001
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount dataparser for pipeline access
+      - ./dataparser:/app/dataparser:ro
+    restart: unless-stopped
+    networks:
+      - app-center-network
+    depends_on:
+      - deepseek-ocr
+      - qwen2-5-1-5b
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  app-center-network:
+    driver: bridge
+    name: app-center-network
+    # Network'ü external olarak işaretleme - otomatik oluşturulur
+

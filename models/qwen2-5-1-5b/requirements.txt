@@ -1,0 +1,15 @@
+# Core dependencies
+transformers>=4.37.0  # Qwen2.5 requires >=4.37.0
+torch>=2.0.0
+accelerate>=0.20.0
+sentencepiece>=0.1.99
+
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Additional utilities
+numpy
+requests
+

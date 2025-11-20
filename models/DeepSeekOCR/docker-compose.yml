@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  deepseek-ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deepseek-ocr-api
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=${MODEL_PATH:-deepseek-ai/DeepSeek-OCR}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount model cache if using local models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      # Optional: mount input/output directories
+      - ./data/input:/app/data/input:ro
+      - ./data/output:/app/data/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - app-center-network
+
+networks:
+  app-center-network:
+    external: true
+    name: app-center-network
+
