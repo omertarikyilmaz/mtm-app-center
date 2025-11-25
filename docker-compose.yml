@@ -15,8 +15,8 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    # Reduced to 0.50 to share GPU with LLM
-    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.50
+    # Increased to 0.60 for better performance
+    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.60
     restart: unless-stopped
 
   # DeepSeek OCR Backend (FastAPI)

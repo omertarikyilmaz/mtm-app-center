@@ -16,7 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+MODEL_ID = "google/gemma-2-9b-it"
 print(f"Loading model: {MODEL_ID} with 4-bit quantization...")
 
 try:

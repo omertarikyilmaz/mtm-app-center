@@ -46,8 +46,8 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Qwen2.5-7B Asistan',
-            description: 'Qwen2.5-7B-Instruct modeli ile güçlendirilmiş, Türkçe yapay zeka asistanı.',
+            name: 'Gemma-2-9B Asistan',
+            description: 'Google Gemma-2-9B modeli ile güçlendirilmiş, akıllı yapay zeka asistanı.',
             icon: <MessageSquare size={32} color="#10b981" />,
             status: 'Yeni'
         },
