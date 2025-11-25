@@ -46,8 +46,8 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Qwen LLM Sohbet',
-            description: 'Qwen3-8B modeli ile yapay zeka destekli sohbet asistanı.',
+            name: 'Türkçe LLM Asistanı',
+            description: 'Mistral-7B tabanlı, Türkçe için özelleştirilmiş yapay zeka asistanı.',
             icon: <MessageSquare size={32} color="#10b981" />,
             status: 'Yeni'
         },

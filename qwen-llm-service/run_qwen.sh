@@ -9,8 +9,8 @@ fi
 # --gpu-memory-utilization 0.45: Limit GPU usage to 45% to allow co-existence with OCR
 # --port 8002: Different port than OCR
 echo "Starting vLLM server for Qwen on port 8002..."
-vllm serve RedHatAI/Qwen3-8B-FP8-dynamic \
-    --gpu-memory-utilization 0.45 \
+vllm serve malhajar/Qwen1.5-7B-turkish \
+    --gpu-memory-utilization 0.30 \
     --port 8002 \
     --trust-remote-code \
     --dtype float16

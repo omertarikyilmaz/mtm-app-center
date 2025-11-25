@@ -16,7 +16,7 @@ services:
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
     # Added --gpu-memory-utilization 0.45
-    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.40
+    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.60
     restart: unless-stopped
 
   # DeepSeek OCR Backend (FastAPI)
@@ -48,7 +48,7 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    command: vllm serve RedHatAI/Qwen3-8B-FP8-dynamic --gpu-memory-utilization 0.40 --port 8002 --trust-remote-code --dtype float16
+    command: vllm serve malhajar/Qwen1.5-7B-turkish --gpu-memory-utilization 0.30 --port 8002 --trust-remote-code --dtype float16
     restart: unless-stopped
 
   # Qwen LLM Backend (FastAPI)
