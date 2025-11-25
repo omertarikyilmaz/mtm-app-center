@@ -818,4 +818,14 @@ files = [
 data = {'openai_api_key': 'sk-...'}
 
 response = requests.post(url, files=files, data=data)
+results = response.json()
+
+for res in results:
+    print(res)`}
+                        </pre>
+                    </div>
+                </section>
+            </div>
+        </div>
+    )
 }
