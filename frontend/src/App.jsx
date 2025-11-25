@@ -46,8 +46,8 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Türkçe LLM Asistanı',
-            description: 'Mistral-7B tabanlı, Türkçe için özelleştirilmiş yapay zeka asistanı.',
+            name: 'Next-1B Asistan',
+            description: 'Lamapi tarafından geliştirilen, hafif ve hızlı Türkçe yapay zeka asistanı.',
             icon: <MessageSquare size={32} color="#10b981" />,
             status: 'Yeni'
         },

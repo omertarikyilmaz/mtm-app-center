@@ -15,8 +15,8 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    # Added --gpu-memory-utilization 0.45
-    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.55
+    # Increased memory to 0.70
+    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.70
     restart: unless-stopped
 
   # DeepSeek OCR Backend (FastAPI)
@@ -32,13 +32,13 @@ services:
       - vllm
     restart: unless-stopped
 
-  # Qwen LLM Service (vLLM)
-  qwen-vllm:
+  # Next-1B Service (Standalone Transformers)
+  next-service:
     build:
-      context: ./qwen-llm-service
-      dockerfile: Dockerfile.vllm
+      context: ./next-llm-service
+      dockerfile: Dockerfile
     ports:
-      - "8002:8002"
+      - "8003:8003"
     deploy:
       resources:
         reservations:
@@ -48,20 +48,6 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    command: vllm serve malhajar/Qwen1.5-7B-turkish --gpu-memory-utilization 0.35 --quantization bitsandbytes --load-format bitsandbytes --port 8002 --trust-remote-code --dtype float16
-    restart: unless-stopped
-
-  # Qwen LLM Backend (FastAPI)
-  qwen-backend:
-    build:
-      context: ./qwen-llm-service
-      dockerfile: Dockerfile
-    ports:
-      - "8003:8003"
-    environment:
-      - VLLM_URL=http://qwen-vllm:8002/v1
-    depends_on:
-      - qwen-vllm
     restart: unless-stopped
 
   # Frontend (React + Nginx)
@@ -73,5 +59,5 @@ services:
       - "80:80"
     depends_on:
       - backend
-      - qwen-backend
+      - next-service
     restart: unless-stopped

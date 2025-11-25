@@ -17,4 +17,4 @@ vllm serve deepseek-ai/DeepSeek-OCR \
     --mm-processor-cache-gb 0 \
     --port 8000 \
     --trust-remote-code \
-    --gpu-memory-utilization 0.45
+    --gpu-memory-utilization 0.70
