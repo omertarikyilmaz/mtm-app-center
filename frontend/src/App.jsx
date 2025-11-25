@@ -46,8 +46,8 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Next-1B Asistan',
-            description: 'Lamapi tarafından geliştirilen, hafif ve hızlı Türkçe yapay zeka asistanı.',
+            name: 'Qwen2.5-7B Asistan',
+            description: 'Qwen2.5-7B-Instruct modeli ile güçlendirilmiş, Türkçe yapay zeka asistanı.',
             icon: <MessageSquare size={32} color="#10b981" />,
             status: 'Yeni'
         },

@@ -4,5 +4,6 @@ pydantic
 transformers
 torch
 accelerate
+bitsandbytes
 protobuf
 sentencepiece
