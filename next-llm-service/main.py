@@ -52,74 +52,49 @@ async def chat(request: ChatRequest):
     Chat with Next-1B LLM.
     """
     try:
-        # Robust Message Handling Strategy:
-        # 1. Extract system message content if present.
-        # 2. Filter only 'user' and 'assistant' messages.
-        # 3. Ensure strict alternation: User -> Assistant -> User ...
-        # 4. Merge system message into the first User message.
+        # Add system message if not present
+        if not request.messages or request.messages[0].get("role") != "system":
+            system_message = {
+                "role": "system",
+                "content": "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."
+            }
+            request.messages.insert(0, system_message)
         
-        system_content = "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."
+        print(f"DEBUG: Messages being sent: {request.messages}")
         
-        clean_messages = []
-        last_role = None
-        
-        for msg in request.messages:
-            role = msg.get('role')
-            content = msg.get('content')
-            
-            if role == 'system':
-                system_content = content # Override default if provided
-                continue
-            
-            if role not in ['user', 'assistant']:
-                continue
-                
-            # Skip if sequence is broken (e.g. Assistant first, or double User)
-            if last_role is None:
-                if role != 'user':
-                    continue # Must start with User
-            else:
-                if role == last_role:
-                    continue # Must alternate
-            
-            clean_messages.append({"role": role, "content": content})
-            last_role = role
-            
-        # If no messages left (e.g. only system was sent), create a dummy user message to avoid crash
-        if not clean_messages:
-            clean_messages.append({"role": "user", "content": "Merhaba"})
-
-        # Merge system prompt into the first user message
-        # This avoids "System role not supported" errors common in some templates
-        if clean_messages and clean_messages[0]['role'] == 'user':
-            clean_messages[0]['content'] = f"{system_content}\n\n{clean_messages[0]['content']}"
-
-        print(f"DEBUG: Final messages passed to model: {clean_messages}")
-        
-        # Update request messages
-        request.messages = clean_messages
-
-        # Prepare input with Tokenizer
+        # Prepare input with Tokenizer - EXACTLY as per documentation
         prompt = tokenizer.apply_chat_template(request.messages, tokenize=False, add_generation_prompt=True)
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
         # Output from the model
-        outputs = model.generate(
-            **inputs, 
+        output = model.generate(
+            **inputs,
             max_new_tokens=request.max_tokens,
             temperature=request.temperature,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id
         )
         
-        # Decode response
-        # We skip the input prompt in the output
-        response_text = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+        # Decode the full output and skip special tokens
+        response_text = tokenizer.decode(output[0], skip_special_tokens=True)
+        
+        # Extract only the assistant's response (remove the prompt part)
+        # The prompt is everything before the last assistant turn
+        if "assistant" in response_text.lower():
+            # Split and take everything after the last occurrence of common assistant markers
+            parts = response_text.split("assistant")
+            if len(parts) > 1:
+                response_text = parts[-1].strip()
+                # Clean up any leading colons or newlines
+                response_text = response_text.lstrip(":\n").strip()
         
         return ChatResponse(response=response_text.strip())
     except Exception as e:
         print(f"Error generating response: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8003, reload=False)
