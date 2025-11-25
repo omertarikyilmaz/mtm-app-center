@@ -52,6 +52,16 @@ async def chat(request: ChatRequest):
     Chat with Next-1B LLM.
     """
     try:
+        # Add system message if not present
+        if not request.messages or request.messages[0].get("role") != "system":
+            system_message = {
+                "role": "system", 
+                "content": "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."
+            }
+            request.messages.insert(0, system_message)
+
+        print(f"DEBUG: Processing messages: {request.messages}")
+
         # Prepare input with Tokenizer
         prompt = tokenizer.apply_chat_template(request.messages, tokenize=False, add_generation_prompt=True)
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)

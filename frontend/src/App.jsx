@@ -287,8 +287,10 @@ function ChatInterface() {
         setLoading(true)
 
         try {
-            // Prepare messages for API (exclude initial greeting if needed, but here we keep context)
-            const apiMessages = [...messages, userMessage].map(m => ({ role: m.role, content: m.content }))
+            // Prepare messages for API (exclude initial greeting as models expect User first)
+            const apiMessages = [...messages, userMessage]
+                .filter((m, i) => !(i === 0 && m.role === 'assistant'))
+                .map(m => ({ role: m.role, content: m.content }))
 
             const response = await fetch('/api/v1/chat', {
                 method: 'POST',
