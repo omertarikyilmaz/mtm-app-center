@@ -32,6 +32,20 @@ services:
       - vllm
     restart: unless-stopped
 
+  # OpenAI İflas OCR Pipeline
+  iflas-pipeline:
+    build:
+      context: ./openai-iflas-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - DEEPSEEK_OCR_URL=http://backend:8001/api/v1/ocr
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   # Local LLM Service (Turkish-Gemma-9B, currently disabled)
   local-llm-service:
     build:
@@ -61,4 +75,5 @@ services:
       - "80:80"
     depends_on:
       - backend
+      - iflas-pipeline
     restart: unless-stopped
