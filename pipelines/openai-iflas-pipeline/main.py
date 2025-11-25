@@ -129,17 +129,24 @@ async def process_iflas_notice(
             # Step 1: Call DeepSeek OCR
             # Reset file pointer if needed, though UploadFile usually handles this
             file_content = await file.read()
-            ocr_files = {"file": (file.filename, file_content, file.content_type)}
+            # Fix: Use 'files' as key to match DeepSeek OCR endpoint expectation
+            ocr_files = {"files": (file.filename, file_content, file.content_type)}
             
             ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
             
             if not ocr_response.ok:
-                print(f"Error processing {file.filename}: OCR failed")
+                print(f"Error processing {file.filename}: OCR failed with status {ocr_response.status_code}")
                 results.append(IflasResult(raw_ocr_text=f"Error: OCR failed for {file.filename}"))
                 continue
             
             ocr_data = ocr_response.json()
-            ocr_text = ocr_data.get("text", "")
+            # Fix: Handle list response from OCR service
+            if isinstance(ocr_data, list) and len(ocr_data) > 0:
+                ocr_text = ocr_data[0].get("text", "")
+            elif isinstance(ocr_data, dict):
+                ocr_text = ocr_data.get("text", "")
+            else:
+                ocr_text = ""
             
             if not ocr_text or len(ocr_text.strip()) < 10:
                 print(f"Error processing {file.filename}: Text too short")
