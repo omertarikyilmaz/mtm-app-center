@@ -10,7 +10,9 @@ fi
 # --port 8002: Different port than OCR
 echo "Starting vLLM server for Qwen on port 8002..."
 vllm serve malhajar/Qwen1.5-7B-turkish \
-    --gpu-memory-utilization 0.30 \
+    --gpu-memory-utilization 0.35 \
+    --quantization bitsandbytes \
+    --load-format bitsandbytes \
     --port 8002 \
     --trust-remote-code \
     --dtype float16
