@@ -20,7 +20,6 @@ app.add_middleware(
 
 # Configuration
 DEEPSEEK_OCR_URL = os.getenv("DEEPSEEK_OCR_URL", "http://backend:8001/api/v1/ocr")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 class IflasResult(BaseModel):
     ad_soyad_unvan: Optional[str] = None
@@ -99,12 +98,11 @@ async def process_iflas_notice(
     2. Uses OpenAI GPT-4 to extract structured fields
     """
     try:
-        # Use provided API key or fall back to environment variable
-        api_key = openai_api_key or OPENAI_API_KEY
-        if not api_key:
+        # API key must be provided by user
+        if not openai_api_key or not openai_api_key.strip():
             raise HTTPException(
                 status_code=400, 
-                detail="OpenAI API Key gerekli. Lütfen API key'inizi sağlayın."
+                detail="OpenAI API Key gerekli. Lütfen formdan API key'inizi girin."
             )
         
         # Step 1: Call DeepSeek OCR
@@ -129,7 +127,7 @@ async def process_iflas_notice(
         print(f"DEBUG: OCR Text Length: {len(ocr_text)}")
         
         # Step 2: Call OpenAI GPT-4 for structured extraction
-        client = openai.OpenAI(api_key=api_key)
+        client = openai.OpenAI(api_key=openai_api_key)
         
         prompt = create_extraction_prompt(ocr_text)
         
