@@ -53,6 +53,22 @@ async def chat(request: ChatRequest):
     """
     try:
         # Add system message if not present
+        # Filter out any leading 'assistant' messages to ensure alternation starts correctly
+        # We keep 'system' if present, then ensure next is 'user'
+        filtered_messages = []
+        for i, msg in enumerate(request.messages):
+            if msg['role'] == 'system':
+                filtered_messages.append(msg)
+            elif msg['role'] == 'assistant':
+                # Only allow assistant if we already have a user message (and it's not the first non-system msg)
+                if any(m['role'] == 'user' for m in filtered_messages):
+                    filtered_messages.append(msg)
+            else:
+                filtered_messages.append(msg)
+        
+        request.messages = filtered_messages
+
+        # Add system message if not present at start
         if not request.messages or request.messages[0].get("role") != "system":
             system_message = {
                 "role": "system", 
