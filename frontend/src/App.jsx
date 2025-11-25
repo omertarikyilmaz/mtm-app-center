@@ -761,22 +761,60 @@ function Documentation() {
                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.8rem' }}>Python Example</div>
                         <pre style={{ margin: 0, padding: '1.5rem', overflowX: 'auto', fontSize: '0.9rem', fontFamily: 'monospace', color: '#e2e8f0', lineHeight: '1.6' }}>
                             {`import requests
+import os
+import json
 
-url = "http://localhost/api/v1/ocr"
+# Konfigürasyon
+API_URL = "http://localhost/api/v1/ocr"
+IMAGE_DIR = "./images"  # Görsellerin olduğu klasör
+OUTPUT_FILE = "ocr_results.json"
 
-# Çoklu dosya yükleme
-files = [
-    ('files', ('doc1.jpg', open('doc1.jpg', 'rb'), 'image/jpeg')),
-    ('files', ('doc2.png', open('doc2.png', 'rb'), 'image/png'))
-]
-data = {'response_format': 'json'}
+# Klasördeki tüm görselleri topla
+files_to_upload = []
+supported_extensions = ('.jpg', '.jpeg', '.png', '.webp')
 
-response = requests.post(url, files=files, data=data)
-results = response.json()
+print(f"{IMAGE_DIR} klasörü taranıyor...")
+for filename in os.listdir(IMAGE_DIR):
+    if filename.lower().endswith(supported_extensions):
+        file_path = os.path.join(IMAGE_DIR, filename)
+        # ('files', (filename, open(file_path, 'rb'), content_type)) formatında ekle
+        files_to_upload.append(
+            ('files', (filename, open(file_path, 'rb'), 'image/jpeg'))
+        )
 
-for res in results:
-    print(f"File: {res['filename']}")
-    print(f"Text: {res['text'][:100]}...")`}
+if not files_to_upload:
+    print("Görsel bulunamadı!")
+    exit()
+
+print(f"{len(files_to_upload)} adet görsel gönderiliyor...")
+
+try:
+    # İsteği gönder
+    response = requests.post(
+        API_URL, 
+        files=files_to_upload,
+        data={'response_format': 'json'}
+    )
+    
+    if response.status_code == 200:
+        results = response.json()
+        
+        # Sonuçları kaydet
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+            
+        print(f"İşlem başarılı! Sonuçlar {OUTPUT_FILE} dosyasına kaydedildi.")
+        
+        # Önizleme
+        for res in results[:3]: # İlk 3 sonucu göster
+            print(f"- {res['filename']}: {res['text'][:50]}...")
+    else:
+        print(f"Hata oluştu: {response.status_code} - {response.text}")
+
+finally:
+    # Dosyaları kapat
+    for _, (_, file_obj, _) in files_to_upload:
+        file_obj.close()`}
                         </pre>
                     </div>
                 </section>
@@ -817,23 +855,4 @@ for res in results:
                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.8rem' }}>Python Example</div>
                         <pre style={{ margin: 0, padding: '1.5rem', overflowX: 'auto', fontSize: '0.9rem', fontFamily: 'monospace', color: '#e2e8f0', lineHeight: '1.6' }}>
                             {`import requests
-
-url = "http://localhost/api/v1/pipelines/iflas-ocr"
-files = [
-    ('files', ('ilan1.jpg', open('ilan1.jpg', 'rb'), 'image/jpeg')),
-    ('files', ('ilan2.jpg', open('ilan2.jpg', 'rb'), 'image/jpeg'))
-]
-data = {'openai_api_key': 'sk-...'}
-
-response = requests.post(url, files=files, data=data)
-results = response.json()
-
-for res in results:
-    print(res)`}
-                        </pre>
-                    </div>
-                </section>
-            </div>
-        </div>
-    )
 }
