@@ -9,9 +9,7 @@ function App() {
             <header style={{ borderBottom: '1px solid var(--border-color)', padding: '1rem 0', background: 'var(--glass-bg)', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(10px)' }}>
                 <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => setCurrentView('dashboard')}>
-                        <div style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', padding: '0.5rem', borderRadius: '0.5rem', display: 'flex' }}>
-                            <LayoutGrid size={24} color="white" />
-                        </div>
+                        <img src="/logo.png" alt="MTM Logo" style={{ height: '40px', width: 'auto' }} />
                         <h1 style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.025em' }}>Medya Takip Merkezi (MTM)</h1>
                     </div>
                     {currentView !== 'dashboard' && (
