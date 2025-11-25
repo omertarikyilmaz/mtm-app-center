@@ -15,10 +15,12 @@ class LLMClient:
         Generate text response from LLM.
         """
         try:
+            max_tokens = int(os.getenv("MAX_TOKENS", "4096"))
+            print(f"DEBUG: Sending request to vLLM with max_tokens={max_tokens}")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                max_tokens=4096,
+                max_tokens=int(os.getenv("MAX_TOKENS", "4096")),
                 temperature=temperature,
                 top_p=0.95,
                 extra_body={
