@@ -1,0 +1,17 @@
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+
+WORKDIR /app
+
+# Install python and pip
+RUN apt-get update && apt-get install -y python3 python3-pip git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install vLLM nightly as per DeepSeek-OCR requirements
+RUN pip3 install -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly --extra-index-url https://download.pytorch.org/whl/cu129 --index-strategy unsafe-best-match
+
+# Expose port
+EXPOSE 8000
+
+# Command to run vLLM
+# Note: Arguments should be passed via docker-compose command or overridden here
+CMD ["vllm", "serve", "deepseek-ai/DeepSeek-OCR", "--logits_processors", "vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor", "--no-enable-prefix-caching", "--mm-processor-cache-gb", "0", "--port", "8000", "--trust-remote-code"]

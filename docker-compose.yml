@@ -1,0 +1,40 @@
+services:
+  vllm:
+    build:
+      context: ./deepseek-ocr-service
+      dockerfile: Dockerfile.vllm
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./.cache/huggingface:/root/.cache/huggingface
+    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./deepseek-ocr-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - VLLM_URL=http://vllm:8000/v1
+    depends_on:
+      - vllm
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
