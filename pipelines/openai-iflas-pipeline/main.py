@@ -104,97 +104,79 @@ Aşağıdaki JSON şemasını kullanarak yanıt ver:
 async def health_check():
     return {"status": "healthy"}
 
-@app.post("/api/v1/pipelines/iflas-ocr", response_model=IflasResult)
+@app.post("/api/v1/pipelines/iflas-ocr", response_model=List[IflasResult])
 async def process_iflas_notice(
-    file: UploadFile = File(...),
-    openai_api_key: Optional[str] = Form(None)
+    files: List[UploadFile] = File(...),
+    openai_api_key: Optional[str] = Form(None),
+    response_format: str = Form("json")
 ):
     """
-    Processes a bankruptcy/foreclosure notice image:
+    Processes multiple bankruptcy/foreclosure notice images:
     1. Extracts text using DeepSeek OCR
     2. Uses OpenAI GPT-4 to extract structured fields
     """
+    results = []
 
-    try:
-        # API key must be provided by user
-        if not openai_api_key or not openai_api_key.strip():
-            raise HTTPException(
-                status_code=400, 
-                detail="OpenAI API Key gerekli. Lütfen formdan API key'inizi girin."
-            )
-        
-        # Step 1: Call DeepSeek OCR
-        files = {"file": (file.filename, await file.read(), file.content_type)}
-        ocr_response = requests.post(DEEPSEEK_OCR_URL, files=files, timeout=60)
-        
-        if not ocr_response.ok:
-            raise HTTPException(
-                status_code=500,
-                detail=f"DeepSeek OCR hatası: {ocr_response.text}"
-            )
-        
-        ocr_data = ocr_response.json()
-        ocr_text = ocr_data.get("text", "")
-        
-        if not ocr_text or len(ocr_text.strip()) < 10:
-            raise HTTPException(
-                status_code=400,
-                detail="OCR metni çok kısa veya boş. Lütfen daha net bir görsel yükleyin."
-            )
-        
-        print(f"DEBUG: OCR Text Length: {len(ocr_text)}")
-        
-        # Step 2: Call OpenAI GPT-4 for structured extraction
-        client = openai.OpenAI(api_key=openai_api_key)
-        
-        prompt = create_extraction_prompt(ocr_text)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Cost-effective model
-            messages=[
-                {"role": "system", "content": "Sen yapılandırılmış veri çıkarımı yapan bir asistansın. Sadece geçerli JSON döndür."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,  # Low temperature for consistent extraction
-            max_tokens=1000,
-            response_format={"type": "json_object"}
+    # API key must be provided by user
+    if not openai_api_key or not openai_api_key.strip():
+        raise HTTPException(
+            status_code=400, 
+            detail="OpenAI API Key gerekli. Lütfen formdan API key'inizi girin."
         )
-        
-        # Parse GPT-4 response
-        extracted_data = json.loads(response.choices[0].message.content)
-        
-        print(f"DEBUG: Extracted Data: {extracted_data}")
-        
-        # Return structured result
-        return IflasResult(
-            **extracted_data,
-            raw_ocr_text=ocr_text,
-            confidence="high" if len(ocr_text) > 100 else "medium"
-        )
-        
-    except requests.exceptions.ConnectionError:
-        print("Error: Could not connect to DeepSeek OCR service")
-        raise HTTPException(status_code=503, detail="DeepSeek OCR servisine ulaşılamadı. Servis kapalı veya meşgul olabilir.")
-    except requests.exceptions.Timeout:
-        print("Error: DeepSeek OCR service timed out")
-        raise HTTPException(status_code=504, detail="DeepSeek OCR servisi zaman aşımına uğradı (60s).")
-    except openai.AuthenticationError as e:
-        print(f"OpenAI Auth Error: {e}")
-        raise HTTPException(status_code=401, detail="OpenAI API Key geçersiz veya süresi dolmuş.")
-    except openai.RateLimitError as e:
-        print(f"OpenAI Rate Limit Error: {e}")
-        raise HTTPException(status_code=429, detail="OpenAI hız sınırı aşıldı veya bakiye yetersiz.")
-    except openai.APIError as e:
-        print(f"OpenAI API Error: {e}")
-        raise HTTPException(status_code=502, detail=f"OpenAI API hatası: {str(e)}")
-    except json.JSONDecodeError as e:
-        print(f"JSON Parse Error: {e}")
-        raise HTTPException(status_code=500, detail="OpenAI yanıtı geçerli bir JSON değil.")
-    except Exception as e:
-        print(f"Unhandled Error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Beklenmeyen hata: {str(e)}")
+
+    for file in files:
+        try:
+            # Step 1: Call DeepSeek OCR
+            # Reset file pointer if needed, though UploadFile usually handles this
+            file_content = await file.read()
+            ocr_files = {"file": (file.filename, file_content, file.content_type)}
+            
+            ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
+            
+            if not ocr_response.ok:
+                print(f"Error processing {file.filename}: OCR failed")
+                results.append(IflasResult(raw_ocr_text=f"Error: OCR failed for {file.filename}"))
+                continue
+            
+            ocr_data = ocr_response.json()
+            ocr_text = ocr_data.get("text", "")
+            
+            if not ocr_text or len(ocr_text.strip()) < 10:
+                print(f"Error processing {file.filename}: Text too short")
+                results.append(IflasResult(raw_ocr_text=f"Error: Text too short for {file.filename}"))
+                continue
+            
+            # Step 2: Call OpenAI GPT-4 for structured extraction
+            client = openai.OpenAI(api_key=openai_api_key)
+            
+            prompt = create_extraction_prompt(ocr_text)
+            
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  # Cost-effective model
+                messages=[
+                    {"role": "system", "content": "Sen yapılandırılmış veri çıkarımı yapan bir asistansın. Sadece geçerli JSON döndür."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,  # Low temperature for consistent extraction
+                max_tokens=1000,
+                response_format={"type": "json_object"}
+            )
+            
+            # Parse GPT-4 response
+            extracted_data = json.loads(response.choices[0].message.content)
+            
+            # Return structured result
+            results.append(IflasResult(
+                **extracted_data,
+                raw_ocr_text=ocr_text,
+                confidence="high" if len(ocr_text) > 100 else "medium"
+            ))
+            
+        except Exception as e:
+            print(f"Error processing {file.filename}: {e}")
+            results.append(IflasResult(raw_ocr_text=f"Error processing {file.filename}: {str(e)}"))
+            
+    return results
 
 if __name__ == "__main__":
     import uvicorn
