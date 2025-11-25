@@ -855,4 +855,43 @@ finally:
                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.8rem' }}>Python Example</div>
                         <pre style={{ margin: 0, padding: '1.5rem', overflowX: 'auto', fontSize: '0.9rem', fontFamily: 'monospace', color: '#e2e8f0', lineHeight: '1.6' }}>
                             {`import requests
+import os
+import json
+
+# Konfigürasyon
+API_URL = "http://localhost/api/v1/pipelines/iflas-ocr"
+IMAGE_DIR = "./ilanlar"
+OPENAI_KEY = "sk-proj-..." # Buraya kendi key'inizi girin
+
+files_to_upload = []
+for filename in os.listdir(IMAGE_DIR):
+    if filename.endswith(('.jpg', '.png')):
+        path = os.path.join(IMAGE_DIR, filename)
+        files_to_upload.append(
+            ('files', (filename, open(path, 'rb'), 'image/jpeg'))
+        )
+
+print(f"{len(files_to_upload)} dosya işleniyor...")
+
+try:
+    response = requests.post(
+        API_URL, 
+        files=files_to_upload,
+        data={'openai_api_key': OPENAI_KEY}
+    )
+    
+    if response.status_code == 200:
+        results = response.json()
+        print(json.dumps(results, indent=2, ensure_ascii=False))
+    else:
+        print("Hata:", response.text)
+finally:
+    for _, (_, f, _) in files_to_upload:
+        f.close()`}
+                        </pre>
+                    </div>
+                </section>
+            </div>
+        </div>
+    )
 }
