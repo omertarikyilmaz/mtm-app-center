@@ -498,7 +498,7 @@ function IflasOCRInterface() {
     }
 
     return (
-        <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
                     <Code size={32} color="#f59e0b" />
@@ -509,105 +509,163 @@ function IflasOCRInterface() {
                 </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
-                    OpenAI API Key *
-                </label>
-                <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-proj-..."
-                    style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        background: 'var(--bg-color)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '0.5rem',
-                        color: 'var(--text-primary)',
-                        fontSize: '0.9rem'
-                    }}
-                />
-                <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    API key'iniz sadece bu istek için kullanılır ve saklanmaz. <a href="https://platform.openai.com/api-keys" target="_blank" style={{ color: '#f59e0b' }}>Buradan alabilirsiniz</a>
-                </p>
-            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                {/* Left Column: Interaction */}
+                <div>
+                    <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
+                            OpenAI API Key *
+                        </label>
+                        <input
+                            type="password"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="sk-proj-..."
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                background: 'var(--bg-color)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '0.5rem',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            API key'iniz sadece bu istek için kullanılır ve saklanmaz. <a href="https://platform.openai.com/api-keys" target="_blank" style={{ color: '#f59e0b' }}>Buradan alabilirsiniz</a>
+                        </p>
+                    </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }}
-                    onClick={() => fileInputRef.current?.click()}
-                >
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                    />
+                    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                        />
 
-                    {preview ? (
-                        <div>
-                            <img src={preview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '0.5rem' }} />
-                            <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>{file.name}</p>
+                        {preview ? (
+                            <div>
+                                <img src={preview} alt="Preview" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '0.5rem' }} />
+                                <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>{file.name}</p>
+                            </div>
+                        ) : (
+                            <>
+                                <Upload size={48} color="var(--text-secondary)" />
+                                <h3 style={{ marginTop: '1rem' }}>Gazete ilanı yükleyin</h3>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>JPG, PNG, WEBP</p>
+                            </>
+                        )}
+                    </div>
+
+                    <button
+                        className="btn btn-primary"
+                        style={{ width: '100%', marginBottom: '1.5rem' }}
+                        disabled={!file || !apiKey || loading}
+                        onClick={handleProcess}
+                    >
+                        {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Verileri Çıkar'}
+                    </button>
+
+                    {(result || error) && (
+                        <div className="glass-panel" style={{ padding: '2rem' }}>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>
+                                <FileText size={20} color="#f59e0b" /> Sonuçlar
+                            </h3>
+
+                            {error ? (
+                                <div style={{ color: '#ef4444', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+                                    <AlertCircle size={20} /> {error}
+                                </div>
+                            ) : result && (
+                                <div style={{ display: 'grid', gap: '1rem' }}>
+                                    {Object.entries(result).map(([key, value]) => {
+                                        if (key === 'raw_ocr_text' || key === 'confidence') return null
+                                        const labels = {
+                                            'ad_soyad_unvan': 'Ad Soyad/Unvan',
+                                            'tckn': 'TCKN',
+                                            'vkn': 'VKN',
+                                            'adres': 'Adres',
+                                            'icra_iflas_mudurlugu': 'İcra Müdürlüğü',
+                                            'dosya_yili': 'Yıl',
+                                            'ilan_turu': 'Tür',
+                                            'ilan_tarihi': 'Tarih',
+                                            'davacilar': 'Davacılar',
+                                            'kaynak': 'Kaynak'
+                                        }
+                                        return (
+                                            <div key={key} style={{ padding: '1rem', background: 'var(--bg-color)', borderRadius: '0.5rem' }}>
+                                                <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>{labels[key] || key}</div>
+                                                <div style={{ marginTop: '0.25rem' }}>
+                                                    {Array.isArray(value) ? value.join(', ') : (value || 'Bulunamadı')}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <>
-                            <Upload size={48} color="var(--text-secondary)" />
-                            <h3 style={{ marginTop: '1rem' }}>Gazete ilanı yükleyin</h3>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>JPG, PNG, WEBP</p>
-                        </>
                     )}
                 </div>
-            </div>
 
-            <button
-                className="btn btn-primary"
-                style={{ width: '100%', marginBottom: '1.5rem' }}
-                disabled={!file || !apiKey || loading}
-                onClick={handleProcess}
-            >
-                {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Verileri Çıkar'}
-            </button>
+                {/* Right Column: API Documentation */}
+                <div>
+                    <div className="glass-panel" style={{ padding: '2rem', height: '100%' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Code size={20} color="#f59e0b" /> API Kullanımı
+                        </h3>
 
-            {(result || error) && (
-                <div className="glass-panel" style={{ padding: '2rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>
-                        <FileText size={20} color="#f59e0b" /> Sonuçlar
-                    </h3>
+                        <div style={{ marginBottom: '2rem' }}>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.6' }}>
+                                Bu pipeline'ı kendi uygulamalarınıza entegre etmek için aşağıdaki Python örneğini kullanabilirsiniz.
+                            </p>
 
-                    {error ? (
-                        <div style={{ color: '#ef4444', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
-                            <AlertCircle size={20} /> {error}
+                            <div style={{ background: '#1e293b', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                                <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontFamily: 'monospace' }}>python</span>
+                                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>requests</span>
+                                </div>
+                                <pre style={{ margin: 0, padding: '1rem', overflowX: 'auto', fontSize: '0.85rem', fontFamily: 'monospace', color: '#e2e8f0' }}>
+                                    {`import requests
+
+url = "http://localhost/api/v1/pipelines/iflas-ocr"
+api_key = "sk-proj-..." # OpenAI API Key
+
+# Görsel dosyasını yükle
+files = {
+    'file': ('gazete_ilani.jpg', open('gazete_ilani.jpg', 'rb'), 'image/jpeg')
+}
+
+# API key'i form verisi olarak gönder
+data = {
+    'openai_api_key': api_key
+}
+
+response = requests.post(url, files=files, data=data)
+
+if response.status_code == 200:
+    result = response.json()
+    print("Ad/Unvan:", result['ad_soyad_unvan'])
+    print("TCKN:", result['tckn'])
+    print("İlan Türü:", result['ilan_turu'])
+else:
+    print("Hata:", response.text)`}
+                                </pre>
+                            </div>
                         </div>
-                    ) : result && (
-                        <div style={{ display: 'grid', gap: '1rem' }}>
-                            {Object.entries(result).map(([key, value]) => {
-                                if (key === 'raw_ocr_text' || key === 'confidence') return null
-                                const labels = {
-                                    'ad_soyad_unvan': 'Ad Soyad/Unvan',
-                                    'tckn': 'TCKN',
-                                    'vkn': 'VKN',
-                                    'adres': 'Adres',
-                                    'icra_iflas_mudurlugu': 'İcra Müdürlüğü',
-                                    'dosya_yili': 'Yıl',
-                                    'ilan_turu': 'Tür',
-                                    'ilan_tarihi': 'Tarih',
-                                    'davacilar': 'Davacılar',
-                                    'kaynak': 'Kaynak'
-                                }
-                                return (
-                                    <div key={key} style={{ padding: '1rem', background: 'var(--bg-color)', borderRadius: '0.5rem' }}>
-                                        <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>{labels[key] || key}</div>
-                                        <div style={{ marginTop: '0.25rem' }}>
-                                            {Array.isArray(value) ? value.join(', ') : (value || 'Bulunamadı')}
-                                        </div>
-                                    </div>
-                                )
-                            })}
+
+                        <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '0.5rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                                <strong style={{ color: '#f59e0b' }}>Endpoint:</strong> POST /api/v1/pipelines/iflas-ocr<br />
+                                <strong style={{ color: '#f59e0b' }}>Response:</strong> JSON (Yapılandırılmış Veri)
+                            </p>
                         </div>
-                    )}
+                    </div>
                 </div>
-            )}
+            </div>
         </div>
     )
 }
