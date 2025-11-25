@@ -40,7 +40,7 @@ class OCRClient:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                max_tokens=8192,
+                max_tokens=4096,
                 temperature=0.0,
                 extra_body={
                     "skip_special_tokens": False,
