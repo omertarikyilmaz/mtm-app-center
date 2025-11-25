@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import requests
@@ -9,6 +10,20 @@ import base64
 from io import BytesIO
 
 app = FastAPI(title="MTM İflas OCR Pipeline", version="1.0.0")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    error_details = traceback.format_exc()
+    print(f"Global Error: {error_details}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Global Server Error: {str(exc)}"},
+    )
+
+@app.get("/")
+async def root():
+    return {"status": "running", "service": "openai-iflas-pipeline"}
 
 app.add_middleware(
     CORSMiddleware,
