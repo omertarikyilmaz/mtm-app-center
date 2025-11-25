@@ -164,17 +164,29 @@ async def process_iflas_notice(
             confidence="high" if len(ocr_text) > 100 else "medium"
         )
         
+    except requests.exceptions.ConnectionError:
+        print("Error: Could not connect to DeepSeek OCR service")
+        raise HTTPException(status_code=503, detail="DeepSeek OCR servisine ulaşılamadı. Servis kapalı veya meşgul olabilir.")
+    except requests.exceptions.Timeout:
+        print("Error: DeepSeek OCR service timed out")
+        raise HTTPException(status_code=504, detail="DeepSeek OCR servisi zaman aşımına uğradı (60s).")
+    except openai.AuthenticationError as e:
+        print(f"OpenAI Auth Error: {e}")
+        raise HTTPException(status_code=401, detail="OpenAI API Key geçersiz veya süresi dolmuş.")
+    except openai.RateLimitError as e:
+        print(f"OpenAI Rate Limit Error: {e}")
+        raise HTTPException(status_code=429, detail="OpenAI hız sınırı aşıldı veya bakiye yetersiz.")
     except openai.APIError as e:
         print(f"OpenAI API Error: {e}")
-        raise HTTPException(status_code=500, detail=f"OpenAI API hatası: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"OpenAI API hatası: {str(e)}")
     except json.JSONDecodeError as e:
         print(f"JSON Parse Error: {e}")
-        raise HTTPException(status_code=500, detail="OpenAI yanıtı parse edilemedi")
+        raise HTTPException(status_code=500, detail="OpenAI yanıtı geçerli bir JSON değil.")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Unhandled Error: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Beklenmeyen hata: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
