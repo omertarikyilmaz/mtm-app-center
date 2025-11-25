@@ -34,13 +34,8 @@ app.add_middleware(
 )
 
 # Configuration
+# Configuration
 DEEPSEEK_OCR_URL = os.getenv("DEEPSEEK_OCR_URL", "http://backend:8001/api/v1/ocr")
-# Default API Key (used if not provided in request) - Obfuscated
-_k1 = "sk-proj-"
-_k2 = "YneofBUctPnhIpKSrwOeCAVA62Cgn-905ipvUEiQbd1j4k032-"
-_k3 = "ZRLQ9RCCmv2FUQWxEonmIKRRT3BlbkFJvA38ezjsSff8VN41eyGkU0GGloT_"
-_k4 = "C856FVTa1yTB5nqkOQAXd1lzfgR3OPsmZNOCzY_ZccHGwA"
-DEFAULT_OPENAI_API_KEY = _k1 + _k2 + _k3 + _k4
 
 class IflasResult(BaseModel):
     ad_soyad_unvan: Optional[str] = None
@@ -120,13 +115,11 @@ async def process_iflas_notice(
     """
 
     try:
-        # Use provided API key or fall back to default
-        api_key = openai_api_key if (openai_api_key and openai_api_key.strip()) else DEFAULT_OPENAI_API_KEY
-        
-        if not api_key:
+        # API key must be provided by user
+        if not openai_api_key or not openai_api_key.strip():
             raise HTTPException(
                 status_code=400, 
-                detail="OpenAI API Key gerekli."
+                detail="OpenAI API Key gerekli. Lütfen formdan API key'inizi girin."
             )
         
         # Step 1: Call DeepSeek OCR
@@ -151,7 +144,7 @@ async def process_iflas_notice(
         print(f"DEBUG: OCR Text Length: {len(ocr_text)}")
         
         # Step 2: Call OpenAI GPT-4 for structured extraction
-        client = openai.OpenAI(api_key=api_key)
+        client = openai.OpenAI(api_key=openai_api_key)
         
         prompt = create_extraction_prompt(ocr_text)
         
