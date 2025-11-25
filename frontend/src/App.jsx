@@ -316,122 +316,123 @@ print("Güven Skoru:", result.get("confidence"))`}
                     </div>
                 </div>
             </div>
-            )
+        </div>
+    )
 }
 
-            function ChatInterface() {
+function ChatInterface() {
     const [messages, setMessages] = useState([
-            {role: 'assistant', content: 'Merhaba! Ben MTM yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?' }
-            ])
-            const [input, setInput] = useState('')
-            const [loading, setLoading] = useState(false)
-            const messagesEndRef = useRef(null)
+        { role: 'assistant', content: 'Merhaba! Ben MTM yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?' }
+    ])
+    const [input, setInput] = useState('')
+    const [loading, setLoading] = useState(false)
+    const messagesEndRef = useRef(null)
 
     const scrollToBottom = () => {
-                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-            }
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
 
     useEffect(() => {
-                scrollToBottom()
-            }, [messages])
+        scrollToBottom()
+    }, [messages])
 
     const handleSend = async (e) => {
-                e.preventDefault()
+        e.preventDefault()
         if (!input.trim() || loading) return
 
-            const userMessage = {role: 'user', content: input }
+        const userMessage = { role: 'user', content: input }
         setMessages(prev => [...prev, userMessage])
-            setInput('')
-            setLoading(true)
+        setInput('')
+        setLoading(true)
 
-            try {
+        try {
             // Prepare messages for API (exclude initial greeting as models expect User first)
             const apiMessages = [...messages, userMessage]
                 .filter((m, i) => !(i === 0 && m.role === 'assistant'))
-                .map(m => ({role: m.role, content: m.content }))
+                .map(m => ({ role: m.role, content: m.content }))
 
             const response = await fetch('/api/v1/chat', {
                 method: 'POST',
-            headers: {'Content-Type': 'application/json' },
-            body: JSON.stringify({messages: apiMessages })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: apiMessages })
             })
 
             if (!response.ok) throw new Error('Failed to fetch response')
 
             const data = await response.json()
-            setMessages(prev => [...prev, {role: 'assistant', content: data.response }])
+            setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
         } catch (error) {
-                setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.' }])
-            } finally {
-                setLoading(false)
-            }
+            setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.' }])
+        } finally {
+            setLoading(false)
+        }
     }
 
-            return (
-            <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                        <MessageSquare size={32} color="#10b981" />
-                    </div>
-                    <div>
-                        <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Qwen LLM Sohbet</h2>
-                        <p style={{ color: 'var(--text-secondary)' }}>Yapay zeka asistanı ile sohbet edin.</p>
-                    </div>
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <MessageSquare size={32} color="#10b981" />
                 </div>
-
-                <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    {/* Messages Area */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {messages.map((msg, idx) => (
-                            <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                                <div style={{
-                                    maxWidth: '80%',
-                                    padding: '1rem',
-                                    borderRadius: '1rem',
-                                    borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
-                                    borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
-                                    background: msg.role === 'user' ? 'var(--primary-color)' : 'var(--surface-color)',
-                                    color: 'var(--text-primary)',
-                                    lineHeight: 1.5
-                                }}>
-                                    {msg.content}
-                                </div>
-                            </div>
-                        ))}
-                        {loading && (
-                            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '1rem', borderTopLeftRadius: 0 }}>
-                                    <Loader2 className="loading-spinner" size={20} />
-                                </div>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* Input Area */}
-                    <form onSubmit={handleSend} style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1rem' }}>
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Mesajınızı yazın..."
-                            style={{
-                                flex: 1,
-                                background: 'var(--bg-color)',
-                                border: '1px solid var(--border-color)',
-                                padding: '0.75rem 1rem',
-                                borderRadius: '0.5rem',
-                                color: 'white',
-                                outline: 'none'
-                            }}
-                        />
-                        <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
-                            <Send size={20} />
-                        </button>
-                    </form>
+                <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Qwen LLM Sohbet</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Yapay zeka asistanı ile sohbet edin.</p>
                 </div>
             </div>
-            )
+
+            <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Messages Area */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {messages.map((msg, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                            <div style={{
+                                maxWidth: '80%',
+                                padding: '1rem',
+                                borderRadius: '1rem',
+                                borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
+                                borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
+                                background: msg.role === 'user' ? 'var(--primary-color)' : 'var(--surface-color)',
+                                color: 'var(--text-primary)',
+                                lineHeight: 1.5
+                            }}>
+                                {msg.content}
+                            </div>
+                        </div>
+                    ))}
+                    {loading && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '1rem', borderTopLeftRadius: 0 }}>
+                                <Loader2 className="loading-spinner" size={20} />
+                            </div>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <form onSubmit={handleSend} style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1rem' }}>
+                    <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Mesajınızı yazın..."
+                        style={{
+                            flex: 1,
+                            background: 'var(--bg-color)',
+                            border: '1px solid var(--border-color)',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '0.5rem',
+                            color: 'white',
+                            outline: 'none'
+                        }}
+                    />
+                    <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
+                        <Send size={20} />
+                    </button>
+                </form>
+            </div>
+        </div>
+    )
 }
 
-            export default App
+export default App
