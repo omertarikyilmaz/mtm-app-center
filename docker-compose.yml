@@ -35,7 +35,7 @@ services:
   # OpenAI İflas OCR Pipeline
   iflas-pipeline:
     build:
-      context: ./openai-iflas-pipeline
+      context: ./pipelines/openai-iflas-pipeline
       dockerfile: Dockerfile
     ports:
       - "8004:8004"
