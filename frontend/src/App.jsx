@@ -65,39 +65,6 @@ function Dashboard({ onViewChange }) {
                 </p>
             </div>
 
-            {/* API Documentation Section */}
-            <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Code size={24} color="#6366f1" />
-                    API Kullanımı
-                </h3>
-
-                <div style={{ display: 'grid', gap: '1.5rem' }}>
-                    {/* OCR API */}
-                    <div>
-                        <h4 style={{ color: '#6366f1', fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem' }}>DeepSeek OCR API</h4>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                            Görüntülerden metin çıkarımı yapar. Desteklenen formatlar: PNG, JPG, JPEG, WEBP
-                        </p>
-                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '0.5rem', overflow: 'auto' }}>
-                            <pre style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.6 }}>
-                                {`import requests
-
-# OCR isteği gönderme
-url = "http://localhost/api/v1/ocr"
-files = {"file": open("image.jpg", "rb")}
-
-response = requests.post(url, files=files)
-result = response.json()
-
-print("Çıkarılan Metin:", result["text"])
-print("Güven Skoru:", result.get("confidence"))`}
-                            </pre>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div className="grid-layout">
                 {apps.map(app => (
                     <div key={app.id}
@@ -262,169 +229,209 @@ function OCRInterface() {
                     </button>
                 </div>
 
-                {/* Result Section */}
-                <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FileText size={20} color="#6366f1" /> Sonuç
-                        </h3>
-                        {result && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', color: '#10b981' }}>
-                                <CheckCircle size={14} /> Tamamlandı
-                            </span>
-                        )}
+                {/* Results and API Documentation Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                    {/* Result Section */}
+                    <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <FileText size={20} color="#6366f1" /> Sonuç
+                            </h3>
+                            {result && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', color: '#10b981' }}>
+                                    <CheckCircle size={14} /> Tamamlandı
+                                </span>
+                            )}
+                        </div>
+
+                        <div style={{
+                            flex: 1,
+                            background: 'var(--bg-color)',
+                            borderRadius: '0.75rem',
+                            padding: '1.5rem',
+                            overflowY: 'auto',
+                            maxHeight: '500px',
+                            border: '1px solid var(--border-color)',
+                            fontFamily: 'monospace',
+                            whiteSpace: 'pre-wrap',
+                            fontSize: '0.9rem',
+                            lineHeight: 1.6
+                        }}>
+                            {loading ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', gap: '1rem' }}>
+                                    <Loader2 className="loading-spinner" size={32} />
+                                    <p>Doküman analiz ediliyor...</p>
+                                </div>
+                            ) : error ? (
+                                <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <AlertCircle size={20} />
+                                    {error}
+                                </div>
+                            ) : result ? (
+                                result
+                            ) : (
+                                <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                                    Çıkarılan metin burada görünecek...
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div style={{
-                        flex: 1,
-                        background: 'var(--bg-color)',
-                        borderRadius: '0.75rem',
-                        padding: '1.5rem',
-                        overflowY: 'auto',
-                        maxHeight: '500px',
-                        border: '1px solid var(--border-color)',
-                        fontFamily: 'monospace',
-                        whiteSpace: 'pre-wrap',
-                        fontSize: '0.9rem',
-                        lineHeight: 1.6
-                    }}>
-                        {loading ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', gap: '1rem' }}>
-                                <Loader2 className="loading-spinner" size={32} />
-                                <p>Doküman analiz ediliyor...</p>
-                            </div>
-                        ) : error ? (
-                            <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <AlertCircle size={20} />
-                                {error}
-                            </div>
-                        ) : result ? (
-                            result
-                        ) : (
-                            <div style={{ color: 'var(--text-secondary)', textAlign: 'center', marginTop: '4rem' }}>
-                                Sonuç burada görünecek
-                            </div>
-                        )}
+                    {/* API Documentation Section */}
+                    <div className="glass-panel" style={{ padding: '2rem' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <Code size={20} color="#6366f1" />
+                            API Kullanımı
+                        </h3>
+
+                        <div style={{ marginBottom: '1rem' }}>
+                            <h4 style={{ color: '#6366f1', fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>DeepSeek OCR API</h4>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                                Görüntülerden metin çıkarımı yapar. Desteklenen formatlar: PNG, JPG, JPEG, WEBP
+                            </p>
+                        </div>
+
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '0.5rem', overflow: 'auto' }}>
+                            <pre style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.6 }}>
+                                {`import requests
+
+# OCR isteği gönderme
+url = "http://localhost/api/v1/ocr"
+files = {"file": open("image.jpg", "rb")}
+
+response = requests.post(url, files=files)
+result = response.json()
+
+print("Çıkarılan Metin:", result["text"])
+print("Güven Skoru:", result.get("confidence"))`}
+                            </pre>
+                        </div>
+
+                        <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '0.5rem', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                                <strong style={{ color: '#6366f1' }}>Endpoint:</strong> POST /api/v1/ocr<br />
+                                <strong style={{ color: '#6366f1' }}>Response:</strong> JSON {`{ "text": "..." }`}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    )
+            )
 }
 
-function ChatInterface() {
+            function ChatInterface() {
     const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Merhaba! Ben MTM yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?' }
-    ])
-    const [input, setInput] = useState('')
-    const [loading, setLoading] = useState(false)
-    const messagesEndRef = useRef(null)
+            {role: 'assistant', content: 'Merhaba! Ben MTM yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?' }
+            ])
+            const [input, setInput] = useState('')
+            const [loading, setLoading] = useState(false)
+            const messagesEndRef = useRef(null)
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+            }
 
     useEffect(() => {
-        scrollToBottom()
-    }, [messages])
+                scrollToBottom()
+            }, [messages])
 
     const handleSend = async (e) => {
-        e.preventDefault()
+                e.preventDefault()
         if (!input.trim() || loading) return
 
-        const userMessage = { role: 'user', content: input }
+            const userMessage = {role: 'user', content: input }
         setMessages(prev => [...prev, userMessage])
-        setInput('')
-        setLoading(true)
+            setInput('')
+            setLoading(true)
 
-        try {
+            try {
             // Prepare messages for API (exclude initial greeting as models expect User first)
             const apiMessages = [...messages, userMessage]
                 .filter((m, i) => !(i === 0 && m.role === 'assistant'))
-                .map(m => ({ role: m.role, content: m.content }))
+                .map(m => ({role: m.role, content: m.content }))
 
             const response = await fetch('/api/v1/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: apiMessages })
+            headers: {'Content-Type': 'application/json' },
+            body: JSON.stringify({messages: apiMessages })
             })
 
             if (!response.ok) throw new Error('Failed to fetch response')
 
             const data = await response.json()
-            setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
+            setMessages(prev => [...prev, {role: 'assistant', content: data.response }])
         } catch (error) {
-            setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.' }])
-        } finally {
-            setLoading(false)
-        }
+                setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.' }])
+            } finally {
+                setLoading(false)
+            }
     }
 
-    return (
-        <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                    <MessageSquare size={32} color="#10b981" />
-                </div>
-                <div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Qwen LLM Sohbet</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>Yapay zeka asistanı ile sohbet edin.</p>
-                </div>
-            </div>
-
-            <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {/* Messages Area */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {messages.map((msg, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                            <div style={{
-                                maxWidth: '80%',
-                                padding: '1rem',
-                                borderRadius: '1rem',
-                                borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
-                                borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
-                                background: msg.role === 'user' ? 'var(--primary-color)' : 'var(--surface-color)',
-                                color: 'var(--text-primary)',
-                                lineHeight: 1.5
-                            }}>
-                                {msg.content}
-                            </div>
-                        </div>
-                    ))}
-                    {loading && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                            <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '1rem', borderTopLeftRadius: 0 }}>
-                                <Loader2 className="loading-spinner" size={20} />
-                            </div>
-                        </div>
-                    )}
-                    <div ref={messagesEndRef} />
+            return (
+            <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                        <MessageSquare size={32} color="#10b981" />
+                    </div>
+                    <div>
+                        <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Qwen LLM Sohbet</h2>
+                        <p style={{ color: 'var(--text-secondary)' }}>Yapay zeka asistanı ile sohbet edin.</p>
+                    </div>
                 </div>
 
-                {/* Input Area */}
-                <form onSubmit={handleSend} style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1rem' }}>
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Mesajınızı yazın..."
-                        style={{
-                            flex: 1,
-                            background: 'var(--bg-color)',
-                            border: '1px solid var(--border-color)',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            color: 'white',
-                            outline: 'none'
-                        }}
-                    />
-                    <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
-                        <Send size={20} />
-                    </button>
-                </form>
+                <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    {/* Messages Area */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {messages.map((msg, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                                <div style={{
+                                    maxWidth: '80%',
+                                    padding: '1rem',
+                                    borderRadius: '1rem',
+                                    borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
+                                    borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
+                                    background: msg.role === 'user' ? 'var(--primary-color)' : 'var(--surface-color)',
+                                    color: 'var(--text-primary)',
+                                    lineHeight: 1.5
+                                }}>
+                                    {msg.content}
+                                </div>
+                            </div>
+                        ))}
+                        {loading && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '1rem', borderTopLeftRadius: 0 }}>
+                                    <Loader2 className="loading-spinner" size={20} />
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input Area */}
+                    <form onSubmit={handleSend} style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1rem' }}>
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder="Mesajınızı yazın..."
+                            style={{
+                                flex: 1,
+                                background: 'var(--bg-color)',
+                                border: '1px solid var(--border-color)',
+                                padding: '0.75rem 1rem',
+                                borderRadius: '0.5rem',
+                                color: 'white',
+                                outline: 'none'
+                            }}
+                        />
+                        <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
+                            <Send size={20} />
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
-    )
+            )
 }
 
-export default App
+            export default App
