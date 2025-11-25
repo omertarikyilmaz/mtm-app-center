@@ -9,7 +9,6 @@ import os
 
 app = FastAPI(title="MTM Next-1B Service", version="1.0.0")
 
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,7 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load Model
 MODEL_ID = "Lamapi/next-1b"
 print(f"Loading model: {MODEL_ID}...")
 
@@ -52,21 +50,27 @@ async def chat(request: ChatRequest):
     Chat with Next-1B LLM.
     """
     try:
-        # Add system message if not present
-        if not request.messages or request.messages[0].get("role") != "system":
-            system_message = {
-                "role": "system",
-                "content": "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."
-            }
-            request.messages.insert(0, system_message)
+        # SADECE son user mesajını al, gerisini yoksay
+        user_message = None
+        for msg in reversed(request.messages):
+            if msg.get('role') == 'user':
+                user_message = msg.get('content')
+                break
         
-        print(f"DEBUG: Messages being sent: {request.messages}")
+        if not user_message:
+            raise HTTPException(status_code=400, detail="No user message found")
         
-        # Prepare input with Tokenizer - EXACTLY as per documentation
-        prompt = tokenizer.apply_chat_template(request.messages, tokenize=False, add_generation_prompt=True)
+        # Basit mesaj formatı: System + User (conversation history YOK)
+        messages = [
+            {"role": "system", "content": "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."},
+            {"role": "user", "content": user_message}
+        ]
+        
+        print(f"DEBUG: Sending to model: {messages}")
+        
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
 
-        # Output from the model
         output = model.generate(
             **inputs,
             max_new_tokens=request.max_tokens,
@@ -75,26 +79,20 @@ async def chat(request: ChatRequest):
             pad_token_id=tokenizer.eos_token_id
         )
         
-        # Decode the full output and skip special tokens
         response_text = tokenizer.decode(output[0], skip_special_tokens=True)
         
-        # Extract only the assistant's response (remove the prompt part)
-        # The prompt is everything before the last assistant turn
+        # Extract assistant response
         if "assistant" in response_text.lower():
-            # Split and take everything after the last occurrence of common assistant markers
             parts = response_text.split("assistant")
             if len(parts) > 1:
-                response_text = parts[-1].strip()
-                # Clean up any leading colons or newlines
-                response_text = response_text.lstrip(":\n").strip()
+                response_text = parts[-1].strip().lstrip(":\n").strip()
         
         return ChatResponse(response=response_text.strip())
     except Exception as e:
-        print(f"Error generating response: {e}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8003, reload=False)
