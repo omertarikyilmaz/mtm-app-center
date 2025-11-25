@@ -103,7 +103,7 @@ async def process_iflas_notice(
     1. Extracts text using DeepSeek OCR
     2. Uses OpenAI GPT-4 to extract structured fields
     """
-    """
+
     try:
         # Use provided API key or fall back to default
         api_key = openai_api_key if (openai_api_key and openai_api_key.strip()) else DEFAULT_OPENAI_API_KEY
