@@ -52,31 +52,52 @@ async def chat(request: ChatRequest):
     Chat with Next-1B LLM.
     """
     try:
-        # Add system message if not present
-        # Filter out any leading 'assistant' messages to ensure alternation starts correctly
-        # We keep 'system' if present, then ensure next is 'user'
-        filtered_messages = []
-        for i, msg in enumerate(request.messages):
-            if msg['role'] == 'system':
-                filtered_messages.append(msg)
-            elif msg['role'] == 'assistant':
-                # Only allow assistant if we already have a user message (and it's not the first non-system msg)
-                if any(m['role'] == 'user' for m in filtered_messages):
-                    filtered_messages.append(msg)
-            else:
-                filtered_messages.append(msg)
+        # Robust Message Handling Strategy:
+        # 1. Extract system message content if present.
+        # 2. Filter only 'user' and 'assistant' messages.
+        # 3. Ensure strict alternation: User -> Assistant -> User ...
+        # 4. Merge system message into the first User message.
         
-        request.messages = filtered_messages
+        system_content = "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."
+        
+        clean_messages = []
+        last_role = None
+        
+        for msg in request.messages:
+            role = msg.get('role')
+            content = msg.get('content')
+            
+            if role == 'system':
+                system_content = content # Override default if provided
+                continue
+            
+            if role not in ['user', 'assistant']:
+                continue
+                
+            # Skip if sequence is broken (e.g. Assistant first, or double User)
+            if last_role is None:
+                if role != 'user':
+                    continue # Must start with User
+            else:
+                if role == last_role:
+                    continue # Must alternate
+            
+            clean_messages.append({"role": role, "content": content})
+            last_role = role
+            
+        # If no messages left (e.g. only system was sent), create a dummy user message to avoid crash
+        if not clean_messages:
+            clean_messages.append({"role": "user", "content": "Merhaba"})
 
-        # Add system message if not present at start
-        if not request.messages or request.messages[0].get("role") != "system":
-            system_message = {
-                "role": "system", 
-                "content": "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."
-            }
-            request.messages.insert(0, system_message)
+        # Merge system prompt into the first user message
+        # This avoids "System role not supported" errors common in some templates
+        if clean_messages and clean_messages[0]['role'] == 'user':
+            clean_messages[0]['content'] = f"{system_content}\n\n{clean_messages[0]['content']}"
 
-        print(f"DEBUG: Processing messages: {request.messages}")
+        print(f"DEBUG: Final messages passed to model: {clean_messages}")
+        
+        # Update request messages
+        request.messages = clean_messages
 
         # Prepare input with Tokenizer
         prompt = tokenizer.apply_chat_template(request.messages, tokenize=False, add_generation_prompt=True)
