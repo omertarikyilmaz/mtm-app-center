@@ -482,8 +482,17 @@ function IflasOCRInterface() {
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.detail || 'İşlem başarısız oldu')
+                let errorMsg = 'İşlem başarısız oldu'
+                try {
+                    const errorData = await response.json()
+                    errorMsg = errorData.detail || errorMsg
+                } catch (e) {
+                    // If JSON parse fails, it might be an HTML error page (e.g. Nginx 502)
+                    const text = await response.text()
+                    console.error('Non-JSON response:', text)
+                    errorMsg = `Sunucu hatası (${response.status}): ${text.substring(0, 100)}...`
+                }
+                throw new Error(errorMsg)
             }
 
             const data = await response.json()
