@@ -62,7 +62,7 @@ async def chat(request: ChatRequest):
         
         # Basit mesaj formatı: System + User (conversation history YOK)
         messages = [
-            {"role": "system", "content": "You are Next-X1, a smart and concise AI assistant trained by Lamapi. Always respond in the user's language. Proudly made in Turkey."},
+            {"role": "system", "content": "Sen MTM (Medya Takip Merkezi) yapay zeka asistanısın. Akıllı, yardımsever ve öz bir şekilde cevap verirsin. Her zaman kullanıcının dilinde yanıt verirsin."},
             {"role": "user", "content": user_message}
         ]
         
@@ -81,13 +81,8 @@ async def chat(request: ChatRequest):
             pad_token_id=tokenizer.eos_token_id
         )
         
-        response_text = tokenizer.decode(output[0], skip_special_tokens=True)
-        
-        # Extract assistant response
-        if "assistant" in response_text.lower():
-            parts = response_text.split("assistant")
-            if len(parts) > 1:
-                response_text = parts[-1].strip().lstrip(":\n").strip()
+        # SADECE yeni generate edilen tokenleri decode et (prompt hariç)
+        response_text = tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
         
         return ChatResponse(response=response_text.strip())
     except Exception as e:
