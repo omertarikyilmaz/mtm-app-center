@@ -749,6 +749,14 @@ function Documentation() {
                         </ul>
                     </div>
 
+                    <div style={{ marginBottom: '2rem' }}>
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                            <span style={{ background: '#3b82f6', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.85rem', fontWeight: 600 }}>GET</span>
+                            <code style={{ background: 'var(--surface-color)', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', color: 'var(--text-primary)' }}>/health</code>
+                        </div>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Servis sağlık durumunu kontrol eder.</p>
+                    </div>
+
                     <div style={{ background: '#1e293b', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
                         <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', color: '#94a3b8', fontSize: '0.8rem' }}>Python Example</div>
                         <pre style={{ margin: 0, padding: '1.5rem', overflowX: 'auto', fontSize: '0.9rem', fontFamily: 'monospace', color: '#e2e8f0', lineHeight: '1.6' }}>
