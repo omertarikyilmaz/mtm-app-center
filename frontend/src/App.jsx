@@ -67,9 +67,7 @@ function Dashboard({ onViewChange }) {
                 <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '1rem', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     Yapay Zeka Servisleri
                 </h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto' }}>
-                    MTM'in gelişmiş makine öğrenimi servislerini test etmek ve etkileşime geçmek için merkezi platform.
-                </p>
+
             </div>
 
             <div className="grid-layout">

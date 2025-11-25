@@ -7,6 +7,7 @@ import requests
 import openai
 import os
 import base64
+import json
 from io import BytesIO
 
 app = FastAPI(title="MTM İflas OCR Pipeline", version="1.0.0")
@@ -160,7 +161,6 @@ async def process_iflas_notice(
         )
         
         # Parse GPT-4 response
-        import json
         extracted_data = json.loads(response.choices[0].message.content)
         
         print(f"DEBUG: Extracted Data: {extracted_data}")
