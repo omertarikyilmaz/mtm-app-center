@@ -32,10 +32,10 @@ services:
       - vllm
     restart: unless-stopped
 
-  # Qwen2.5-7B LLM Service (4-bit quantized)
-  llm-service:
+  # Local LLM Service (Turkish-Gemma-9B, currently disabled)
+  local-llm-service:
     build:
-      context: ./llm-service
+      context: ./local-llm-service
       dockerfile: Dockerfile
     ports:
       - "8003:8003"
@@ -49,6 +49,8 @@ services:
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
+    profiles:
+      - disabled  # This service is disabled by default
 
   # Frontend (React + Nginx)
   frontend:
@@ -59,5 +61,4 @@ services:
       - "80:80"
     depends_on:
       - backend
-      - llm-service
     restart: unless-stopped

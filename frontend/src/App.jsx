@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ScanText, LayoutGrid, ArrowLeft, Upload, FileText, Loader2, CheckCircle, AlertCircle, MessageSquare, Send, Bot } from 'lucide-react'
+import { ScanText, LayoutGrid, ArrowLeft, Upload, FileText, Loader2, CheckCircle, AlertCircle, MessageSquare, Send, Bot, Code } from 'lucide-react'
 
 function App() {
     const [currentView, setCurrentView] = useState('dashboard')
@@ -46,10 +46,11 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Turkish-Gemma-9B Asistan',
+            name: 'Local Turkish-Gemma LLM',
             description: 'YTÜ COSMOS Turkish-Gemma-9b-T1 modeli - Türkçe\'ye özel eğitilmiş, akıllı reasoning asistanı.',
-            icon: <MessageSquare size={32} color="#10b981" />,
-            status: 'Yeni'
+            icon: <MessageSquare size={32} color="#94a3b8" />,
+            status: 'Hizmet Dışı',
+            disabled: true
         },
     ]
 
@@ -64,18 +65,68 @@ function Dashboard({ onViewChange }) {
                 </p>
             </div>
 
+            {/* API Documentation Section */}
+            <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Code size={24} color="#6366f1" />
+                    API Kullanımı
+                </h3>
+
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                    {/* OCR API */}
+                    <div>
+                        <h4 style={{ color: '#6366f1', fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem' }}>DeepSeek OCR API</h4>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                            Görüntülerden metin çıkarımı yapar. Desteklenen formatlar: PNG, JPG, JPEG, WEBP
+                        </p>
+                        <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '0.5rem', overflow: 'auto' }}>
+                            <pre style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.6 }}>
+                                {`import requests
+
+# OCR isteği gönderme
+url = "http://localhost/api/v1/ocr"
+files = {"file": open("image.jpg", "rb")}
+
+response = requests.post(url, files=files)
+result = response.json()
+
+print("Çıkarılan Metin:", result["text"])
+print("Güven Skoru:", result.get("confidence"))`}
+                            </pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid-layout">
                 {apps.map(app => (
-                    <div key={app.id} className="glass-panel" style={{ padding: '2rem', transition: 'transform 0.2s', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '1rem' }}
-                        onClick={() => onViewChange(app.id)}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+                    <div key={app.id}
+                        className="glass-panel"
+                        style={{
+                            padding: '2rem',
+                            transition: 'transform 0.2s',
+                            cursor: app.disabled ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            opacity: app.disabled ? 0.6 : 1
+                        }}
+                        onClick={() => !app.disabled && onViewChange(app.id)}
+                        onMouseEnter={(e) => !app.disabled && (e.currentTarget.style.transform = 'translateY(-5px)')}
                         onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div style={{ background: app.id === 'ocr' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '1rem' }}>
+                            <div style={{ background: app.disabled ? 'rgba(148, 163, 184, 0.1)' : (app.id === 'ocr' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)'), padding: '1rem', borderRadius: '1rem' }}>
                                 {app.icon}
                             </div>
-                            <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600 }}>
+                            <span style={{
+                                background: app.disabled ? 'rgba(148, 163, 184, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                color: app.disabled ? '#94a3b8' : '#10b981',
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '999px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600
+                            }}>
                                 {app.status}
                             </span>
                         </div>
