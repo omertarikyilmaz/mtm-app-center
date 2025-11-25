@@ -101,6 +101,8 @@ async def chat(request: ChatRequest):
             skip_special_tokens=True
         )
         
+        print(f"DEBUG: Generated response: {response_text[:200]}...")  # Log first 200 chars
+        
         return ChatResponse(response=response_text.strip())
     except Exception as e:
         print(f"Error: {e}")
