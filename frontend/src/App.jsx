@@ -46,8 +46,8 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Mistral-7B Asistan',
-            description: 'Mistral-7B-Instruct modeli ile güçlendirilmiş, akıllı yapay zeka asistanı.',
+            name: 'Turkish-Gemma-9B Asistan',
+            description: 'YTÜ COSMOS Turkish-Gemma-9b-T1 modeli - Türkçe\'ye özel eğitilmiş, akıllı reasoning asistanı.',
             icon: <MessageSquare size={32} color="#10b981" />,
             status: 'Yeni'
         },

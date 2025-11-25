@@ -16,14 +16,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
+MODEL_ID = "ytu-ce-cosmos/Turkish-Gemma-9b-T1"
 print(f"Loading model: {MODEL_ID} with 4-bit quantization...")
 
 try:
     # 4-bit quantization configuration
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_compute_dtype=torch.bfloat16,  # Use bfloat16 as recommended
         bnb_4bit_use_double_quant=True,
         bnb_4bit_quant_type="nf4"
     )
@@ -42,7 +42,7 @@ except Exception as e:
 
 class ChatRequest(BaseModel):
     messages: List[Dict[str, str]]
-    temperature: float = 0.7
+    temperature: float = 0.6  # Recommended for Turkish-Gemma
     max_tokens: int = 512
 
 class ChatResponse(BaseModel):
@@ -55,7 +55,7 @@ async def health_check():
 @app.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
-    Chat with Qwen2.5-7B-Instruct LLM.
+    Chat with Turkish-Gemma-9b-T1 LLM.
     """
     try:
         # Add system message if not present
@@ -77,20 +77,27 @@ async def chat(request: ChatRequest):
         
         inputs = tokenizer([text], return_tensors="pt").to(model.device)
         
-        # Generate response
+        # Get terminators
+        terminators = [
+            tokenizer.eos_token_id,
+            tokenizer.convert_tokens_to_ids("<end_of_turn>")
+        ]
+        
+        # Generate response with recommended parameters for Turkish-Gemma
         outputs = model.generate(
             **inputs,
             max_new_tokens=request.max_tokens,
-            temperature=request.temperature,
-            do_sample=True,
-            top_p=0.9,
-            top_k=50,
+            temperature=0.6,  # Recommended setting
+            do_sample=True,  # DO NOT use greedy decoding
+            top_p=0.95,  # Recommended
+            top_k=20,  # Recommended
+            eos_token_id=terminators,
             pad_token_id=tokenizer.eos_token_id
         )
         
         # Decode only the new tokens
         response_text = tokenizer.decode(
-            outputs[0][inputs.input_ids.shape[1]:],
+            outputs[0][inputs.input_ids.shape[-1]:],
             skip_special_tokens=True
         )
         
