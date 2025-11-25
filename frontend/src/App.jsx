@@ -537,29 +537,8 @@ function IflasOCRInterface() {
                                 fontSize: '0.9rem'
                             }}
                         />
-                        <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>API key'iniz sadece bu istek için kullanılır ve saklanmaz.</span>
-                            <button
-                                onClick={() => {
-                                    // Obfuscated key to avoid GitHub secret scanning
-                                    const p1 = 'sk-proj-'
-                                    const p2 = 'YneofBUctPnhIpKSrwOeCAVA62Cgn-905ipvUEiQbd1j4k032-'
-                                    const p3 = 'ZRLQ9RCCmv2FUQWxEonmIKRRT3BlbkFJvA38ezjsSff8VN41eyGkU0GGloT_'
-                                    const p4 = 'C856FVTa1yTB5nqkOQAXd1lzfgR3OPsmZNOCzY_ZccHGwA'
-                                    setApiKey(p1 + p2 + p3 + p4)
-                                }}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#f59e0b',
-                                    cursor: 'pointer',
-                                    fontSize: '0.8rem',
-                                    textDecoration: 'underline',
-                                    padding: 0
-                                }}
-                            >
-                                Örnek Key Kullan
-                            </button>
+                        <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            API key'iniz sadece bu istek için kullanılır ve saklanmaz. <a href="https://platform.openai.com/api-keys" target="_blank" style={{ color: '#f59e0b' }}>Buradan alabilirsiniz</a>
                         </p>
                     </div>
 
