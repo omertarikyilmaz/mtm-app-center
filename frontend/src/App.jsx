@@ -46,8 +46,8 @@ function Dashboard({ onViewChange }) {
         },
         {
             id: 'chat',
-            name: 'Gemma-2-9B Asistan',
-            description: 'Google Gemma-2-9B modeli ile güçlendirilmiş, akıllı yapay zeka asistanı.',
+            name: 'Mistral-7B Asistan',
+            description: 'Mistral-7B-Instruct modeli ile güçlendirilmiş, akıllı yapay zeka asistanı.',
             icon: <MessageSquare size={32} color="#10b981" />,
             status: 'Yeni'
         },
