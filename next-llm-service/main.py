@@ -73,9 +73,11 @@ async def chat(request: ChatRequest):
 
         output = model.generate(
             **inputs,
-            max_new_tokens=request.max_tokens,
-            temperature=request.temperature,
+            max_new_tokens=min(request.max_tokens, 512),  # Limit to 512
+            temperature=0.3,  # More deterministic
             do_sample=True,
+            top_p=0.9,  # Nucleus sampling
+            top_k=50,  # Top-k sampling
             pad_token_id=tokenizer.eos_token_id
         )
         
