@@ -188,7 +188,6 @@ function KunyeInterface() {
             const reader = response.body.getReader()
             const decoder = new TextDecoder()
             let buffer = ''
-            let allResults = []
             let currentProgress = {
                 current: 0,
                 total: 0,
@@ -199,7 +198,10 @@ function KunyeInterface() {
 
             while (true) {
                 const { done, value } = await reader.read()
-                if (done) break
+                if (done) {
+                    console.log('Stream completed')
+                    break
+                }
 
                 buffer += decoder.decode(value, { stream: true })
                 const lines = buffer.split('\n\n')
@@ -212,6 +214,7 @@ function KunyeInterface() {
 
                             if (data.type === 'init') {
                                 currentProgress.total = data.total
+                                setResults({ _progress: currentProgress })
                             } else if (data.type === 'progress' || data.type === 'success' || data.type === 'error') {
                                 currentProgress = {
                                     current: data.row || currentProgress.current,
@@ -220,13 +223,12 @@ function KunyeInterface() {
                                     message: data.message || '',
                                     clip_id: data.clip_id || currentProgress.clip_id
                                 }
-                                // Update UI state
                                 setResults(prev => ({
                                     ...prev,
                                     _progress: currentProgress
                                 }))
                             } else if (data.type === 'complete') {
-                                allResults = data.results
+                                // Stream complete - set final results
                                 setResults({
                                     total: data.total,
                                     processed: data.processed,
@@ -234,14 +236,17 @@ function KunyeInterface() {
                                     failed: data.failed,
                                     results: data.results
                                 })
+                                setLoading(false) // Clear loading immediately on complete
+                                return // Exit early
                             }
                         } catch (e) {
-                            console.error('Failed to parse SSE data:', e)
+                            console.error('Failed to parse SSE data:', e, line)
                         }
                     }
                 }
             }
         } catch (err) {
+            console.error('Stream error:', err)
             setError(err.message)
         } finally {
             setLoading(false)
