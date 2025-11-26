@@ -140,6 +140,8 @@ function KunyeInterface() {
     const [results, setResults] = useState(null)
     const [error, setError] = useState(null)
     const [apiKey, setApiKey] = useState('')
+    const [useBatchAPI, setUseBatchAPI] = useState(false)
+    const [showDocs, setShowDocs] = useState(false)
     const fileInputRef = useRef(null)
 
     const handleFileChange = (e) => {
@@ -168,7 +170,12 @@ function KunyeInterface() {
         formData.append('id_column', 'A')
 
         try {
-            const response = await fetch('/api/v1/pipelines/mbr-kunye-batch', {
+            // Choose endpoint based on batch mode
+            const endpoint = useBatchAPI
+                ? '/api/v1/pipelines/mbr-kunye-batch-hybrid'
+                : '/api/v1/pipelines/mbr-kunye-batch'
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 body: formData,
             })
@@ -179,7 +186,20 @@ function KunyeInterface() {
             }
 
             const data = await response.json()
-            setResults(data)
+
+            if (useBatchAPI) {
+                // Batch mode: show batch ID
+                setResults({
+                    _isBatch: true,
+                    batch_id: data.batch_id,
+                    status: data.status,
+                    message: data.message,
+                    ocr_count: data.ocr_results?.filter(r => !r.error).length || 0
+                })
+            } else {
+                // Normal mode: show results
+                setResults(data)
+            }
         } catch (err) {
             console.error('Error:', err)
             setError(err.message)
@@ -250,7 +270,69 @@ function KunyeInterface() {
     }
 
     return (
-        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+            {/* Documentation button - top right */}
+            <button
+                onClick={() => setShowDocs(!showDocs)}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    background: 'rgba(236, 72, 153, 0.1)',
+                    border: '1px solid rgba(236, 72, 153, 0.3)',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    color: '#ec4899',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                }}
+            >
+                <span>📖</span> API Dokümantasyonu
+            </button>
+
+            {/* Documentation modal/dropdown */}
+            {showDocs && (
+                <div style={{
+                    position: 'absolute',
+                    top: '3rem',
+                    right: 0,
+                    background: 'var(--surface-color)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '0.75rem',
+                    padding: '1.5rem',
+                    width: '400px',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+                    zIndex: 1000,
+                    fontSize: '0.85rem',
+                    lineHeight: '1.6'
+                }}>
+                    <h3 style={{ marginTop: 0, color: '#ec4899' }}>Batch API Modu</h3>
+                    <p><strong>Normal Mod:</strong> Hızlı, anında sonuç (pahalı)</p>
+                    <p><strong>Batch API Modu:</strong> %50 daha ucuz ama 5-30 dakika beklersiniz</p>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        Batch modu geceleyin büyük işler için idealdir. İşlem sonrası Batch ID alırsınız.
+                    </p>
+                    <button
+                        onClick={() => setShowDocs(false)}
+                        style={{
+                            marginTop: '1rem',
+                            background: '#ec4899',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            cursor: 'pointer',
+                            width: '100%'
+                        }}
+                    >
+                        Anladım
+                    </button>
+                </div>
+            )}
+
             <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
                     <Users size={32} color="#ec4899" />
@@ -283,6 +365,24 @@ function KunyeInterface() {
                                 fontSize: '0.9rem'
                             }}
                         />
+
+                        {/* Batch API Toggle */}
+                        <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            marginTop: '1rem',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem'
+                        }}>
+                            <input
+                                type="checkbox"
+                                checked={useBatchAPI}
+                                onChange={(e) => setUseBatchAPI(e.target.checked)}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span>Batch API kullan (💰 %50 ucuz, ⏰ 5-30 dk)</span>
+                        </label>
                     </div>
 
                     <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
