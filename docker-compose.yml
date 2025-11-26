@@ -1,11 +1,11 @@
 services:
-  # DeepSeek OCR Service (vLLM)
-  vllm:
+  # DeepSeek OCR - Model Server (vLLM)
+  deepseek-ocr-vllm:
     build:
       context: ./deepseek-ocr-service
       dockerfile: Dockerfile.vllm
     ports:
-      - "8000:8000"
+      - "8101:8101"
     deploy:
       resources:
         reservations:
@@ -16,44 +16,45 @@ services:
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
     # Optimized to 0.45 to share GPU with Hunyuan OCR
-    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.45
+    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8101 --trust-remote-code --gpu-memory-utilization 0.45
     restart: unless-stopped
 
-  # DeepSeek OCR Backend (FastAPI)
-  backend:
+  # DeepSeek OCR - API Service (FastAPI)
+  deepseek-ocr-api:
     build:
       context: ./deepseek-ocr-service
       dockerfile: Dockerfile
     ports:
       - "8001:8001"
     environment:
-      - VLLM_URL=http://vllm:8000/v1
+      - VLLM_URL=http://deepseek-ocr-vllm:8101/v1
     depends_on:
-      - vllm
+      - deepseek-ocr-vllm
     restart: unless-stopped
 
-  # OpenAI İflas OCR Pipeline
-  iflas-pipeline:
+  # İflas OCR Pipeline - API Service (OpenAI + OCR)
+  iflas-pipeline-api:
     build:
       context: ./pipelines/openai-iflas-pipeline
       dockerfile: Dockerfile
     ports:
-      - "8004:8004"
+      - "8003:8003"
     environment:
-      - DEEPSEEK_OCR_URL=http://backend:8001/api/v1/ocr
-      - HUNYUAN_OCR_URL=http://hunyuan-backend:8006/api/v1/ocr
+      - DEEPSEEK_OCR_URL=http://deepseek-ocr-api:8001/api/v1/ocr
+      - HUNYUAN_OCR_URL=http://hunyuan-ocr-api:8002/api/v1/ocr
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
-      - backend
+      - deepseek-ocr-api
+      - hunyuan-ocr-api
     restart: unless-stopped
 
-  # Local LLM Service (Turkish-Gemma-9B, currently disabled)
-  local-llm-service:
+  # Local Turkish-Gemma LLM - API Service (DISABLED)
+  local-llm-api:
     build:
       context: ./local-llm-service
       dockerfile: Dockerfile
     ports:
-      - "8003:8003"
+      - "8004:8004"
     deploy:
       resources:
         reservations:
@@ -67,13 +68,13 @@ services:
     profiles:
       - disabled  # This service is disabled by default
 
-  # Hunyuan OCR Service (vLLM)
-  hunyuan-vllm:
+  # Hunyuan OCR - Model Server (vLLM)
+  hunyuan-ocr-vllm:
     build:
       context: ./hunyuan-ocr-service
       dockerfile: Dockerfile.vllm
     ports:
-      - "8005:8005"
+      - "8102:8102"
     deploy:
       resources:
         reservations:
@@ -83,23 +84,23 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    command: python -m vllm.entrypoints.openai.api_server --model tencent/HunyuanOCR --host 0.0.0.0 --port 8005 --trust-remote-code --gpu-memory-utilization 0.45
+    command: python -m vllm.entrypoints.openai.api_server --model tencent/HunyuanOCR --host 0.0.0.0 --port 8102 --trust-remote-code --gpu-memory-utilization 0.45
     restart: unless-stopped
 
-  # Hunyuan OCR Backend (FastAPI)
-  hunyuan-backend:
+  # Hunyuan OCR - API Service (FastAPI)
+  hunyuan-ocr-api:
     build:
       context: ./hunyuan-ocr-service
       dockerfile: Dockerfile
     ports:
-      - "8006:8006"
+      - "8002:8002"
     environment:
-      - VLLM_URL=http://hunyuan-vllm:8005/v1
+      - VLLM_URL=http://hunyuan-ocr-vllm:8102/v1
     depends_on:
-      - hunyuan-vllm
+      - hunyuan-ocr-vllm
     restart: unless-stopped
 
-  # Frontend (React + Nginx)
+  # Frontend - Web UI (React + Nginx)
   frontend:
     build:
       context: ./frontend
@@ -107,7 +108,7 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
-      - hunyuan-backend
-      - iflas-pipeline
+      - deepseek-ocr-api
+      - hunyuan-ocr-api
+      - iflas-pipeline-api
     restart: unless-stopped

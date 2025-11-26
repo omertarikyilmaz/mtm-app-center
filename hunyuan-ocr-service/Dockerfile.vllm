@@ -22,13 +22,13 @@ RUN python -c "from transformers import AutoTokenizer, AutoProcessor; \
 # This is just to prepare the environment
 
 # Expose vLLM port
-EXPOSE 8005
+EXPOSE 8102
 
 # Start vLLM server
 # Note: The command will be overridden in docker-compose.yml
 CMD ["python", "-m", "vllm.entrypoints.openai.api_server", \
      "--model", "tencent/HunyuanOCR", \
      "--host", "0.0.0.0", \
-     "--port", "8005", \
+     "--port", "8102", \
      "--trust-remote-code", \
      "--gpu-memory-utilization", "0.45"]
