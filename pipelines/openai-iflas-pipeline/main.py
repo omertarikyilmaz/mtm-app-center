@@ -204,6 +204,7 @@ def extract_image_url_from_medyatakip(clip_id: str) -> Optional[str]:
     try:
         # Construct the clip URL
         clip_url = f"https://clips.medyatakip.com/pm/clip/{clip_id}"
+        print(f"[DEBUG] Fetching URL: {clip_url}")
         
         # Fetch the page with proper headers
         headers = {
@@ -211,6 +212,7 @@ def extract_image_url_from_medyatakip(clip_id: str) -> Optional[str]:
         }
         response = requests.get(clip_url, headers=headers, timeout=30)
         response.raise_for_status()
+        print(f"[DEBUG] Response status: {response.status_code}")
         
         # Parse HTML
         soup = BeautifulSoup(response.content, 'lxml')
@@ -219,18 +221,25 @@ def extract_image_url_from_medyatakip(clip_id: str) -> Optional[str]:
         # 1. First try the specific class for medyatakip
         img = soup.find('img', class_='showingImage')
         if img:
+            print(f"[DEBUG] Found img with class='showingImage'")
             src = img.get('data-src') or img.get('src') or img.get('data-original')
             if src:
+                print(f"[DEBUG] Image src: {src}")
                 # Return absolute URL
                 if src.startswith('http'):
                     return src
                 else:
                     # Join with base URL
                     from urllib.parse import urljoin
-                    return urljoin(clip_url, src)
+                    absolute_url = urljoin(clip_url, src)
+                    print(f"[DEBUG] Converted to absolute: {absolute_url}")
+                    return absolute_url
+        else:
+            print(f"[DEBUG] No img with class='showingImage' found")
         
         # 2. If specific class not found, search all images with priority
         img_tags = soup.find_all('img')
+        print(f"[DEBUG] Found {len(img_tags)} total img tags")
         candidate_images = []
         
         for img in img_tags:
@@ -263,21 +272,28 @@ def extract_image_url_from_medyatakip(clip_id: str) -> Optional[str]:
             
             candidate_images.append((priority, src))
         
+        print(f"[DEBUG] Found {len(candidate_images)} candidate images after filtering")
+        
         # Sort by priority and return highest
         if candidate_images:
             candidate_images.sort(reverse=True, key=lambda x: x[0])
             src = candidate_images[0][1]
+            print(f"[DEBUG] Selected image (priority={candidate_images[0][0]}): {src}")
             if src.startswith('http'):
                 return src
             else:
                 from urllib.parse import urljoin
-                return urljoin(clip_url, src)
+                absolute_url = urljoin(clip_url, src)
+                print(f"[DEBUG] Converted to absolute: {absolute_url}")
+                return absolute_url
         
-        print(f"Warning: No image found for clip ID {clip_id}")
+        print(f"[WARNING] No suitable image found for clip ID {clip_id}")
         return None
         
     except Exception as e:
-        print(f"Error extracting image from {clip_id}: {e}")
+        print(f"[ERROR] Error extracting image from {clip_id}: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
