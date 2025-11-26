@@ -160,6 +160,7 @@ function KunyeInterface() {
 
         setLoading(true)
         setError(null)
+        setResults(null)
 
         const formData = new FormData()
         formData.append('file', excelFile)
@@ -167,7 +168,7 @@ function KunyeInterface() {
         formData.append('id_column', 'A')
 
         try {
-            const response = await fetch('/api/v1/pipelines/mbr-kunye-batch', {
+            const response = await fetch('/api/v1/pipelines/mbr-kunye-batch-stream', {
                 method: 'POST',
                 body: formData,
             })
@@ -183,8 +184,63 @@ function KunyeInterface() {
                 throw new Error(errorMsg)
             }
 
-            const data = await response.json()
-            setResults(data)
+            // Process SSE stream
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            let allResults = []
+            let currentProgress = {
+                current: 0,
+                total: 0,
+                step: '',
+                message: '',
+                clip_id: ''
+            }
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n\n')
+                buffer = lines.pop() || ''
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6))
+
+                            if (data.type === 'init') {
+                                currentProgress.total = data.total
+                            } else if (data.type === 'progress' || data.type === 'success' || data.type === 'error') {
+                                currentProgress = {
+                                    current: data.row || currentProgress.current,
+                                    total: data.total || currentProgress.total,
+                                    step: data.step || '',
+                                    message: data.message || '',
+                                    clip_id: data.clip_id || currentProgress.clip_id
+                                }
+                                // Update UI state
+                                setResults(prev => ({
+                                    ...prev,
+                                    _progress: currentProgress
+                                }))
+                            } else if (data.type === 'complete') {
+                                allResults = data.results
+                                setResults({
+                                    total: data.total,
+                                    processed: data.processed,
+                                    successful: data.successful,
+                                    failed: data.failed,
+                                    results: data.results
+                                })
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse SSE data:', e)
+                        }
+                    }
+                }
+            }
         } catch (err) {
             setError(err.message)
         } finally {
@@ -340,9 +396,64 @@ function KunyeInterface() {
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuçlar</h3>
 
                     {loading && (
-                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                            <Loader2 className="loading-spinner" size={32} />
-                            <p style={{ marginTop: '1rem' }}>Künyeler analiz ediliyor...</p>
+                        <div style={{ padding: '2rem' }}>
+                            {/* Progress bar and current status */}
+                            {results?._progress && (
+                                <div style={{ marginBottom: '2rem' }}>
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                            <span style={{ fontWeight: 600, color: '#ec4899' }}>
+                                                {results._progress.current} / {results._progress.total}
+                                            </span>
+                                            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                                {Math.round((results._progress.current / results._progress.total) * 100)}%
+                                            </span>
+                                        </div>
+                                        <div style={{ width: '100%', height: '8px', background: 'var(--surface-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                                            <div style={{
+                                                width: `${(results._progress.current / results._progress.total) * 100}%`,
+                                                height: '100%',
+                                                background: 'linear-gradient(90deg, #ec4899, #f472b6)',
+                                                transition: 'width 0.3s ease'
+                                            }}></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Current item being processed */}
+                                    <div style={{
+                                        padding: '1rem',
+                                        background: 'rgba(236, 72, 153, 0.05)',
+                                        borderRadius: '0.5rem',
+                                        border: '1px solid rgba(236, 72, 153, 0.2)'
+                                    }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                                            Clip ID: <strong>{results._progress.clip_id}</strong>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <Loader2 className="loading-spinner" size={16} />
+                                            <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                                                {results._progress.step === 'url' && '🔗 URL Oluşturuluyor'}
+                                                {results._progress.step === 'download' && '⬇️ Görsel İndiriliyor'}
+                                                {results._progress.step === 'ocr' && '🔍 OCR İşleniyor'}
+                                                {results._progress.step === 'ai' && '🤖 AI Analiz Ediyor'}
+                                            </span>
+                                        </div>
+                                        {results._progress.message && (
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                                {results._progress.message}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Spinner if no progress yet */}
+                            {!results?._progress && (
+                                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                    <Loader2 className="loading-spinner" size={32} />
+                                    <p style={{ marginTop: '1rem' }}>Başlatılıyor...</p>
+                                </div>
+                            )}
                         </div>
                     )}
 

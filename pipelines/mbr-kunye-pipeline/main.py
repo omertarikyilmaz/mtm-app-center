@@ -11,6 +11,7 @@ from io import BytesIO
 import pandas as pd
 from PIL import Image
 import time
+import asyncio
 
 app = FastAPI(title="MTM MBR Künye Pipeline", version="1.0.0")
 
@@ -149,6 +150,171 @@ def download_image(image_url: str) -> Optional[bytes]:
         print(f"[ERROR] Error downloading image from {image_url}: {e}")
         return None
 
+@app.post("/api/v1/pipelines/mbr-kunye-batch-stream")
+async def process_mbr_kunye_batch_stream(
+    file: UploadFile = File(...),
+    openai_api_key: Optional[str] = Form(None),
+    id_column: str = Form("A"),
+):
+    """
+    Processes batch with Server-Sent Events for real-time progress updates
+    """
+    from fastapi.responses import StreamingResponse
+    
+    # Validate API key
+    if not openai_api_key or not openai_api_key.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="OpenAI API Key gerekli."
+        )
+    
+    async def event_generator():
+        results = []
+        total = 0
+        successful = 0
+        failed = 0
+        
+        try:
+            # Read Excel file
+            contents = await file.read()
+            df = pd.read_excel(BytesIO(contents))
+            
+            # Get column index (A=0)
+            col_idx = 0
+            if id_column.isalpha():
+                col_idx = ord(id_column.upper()) - 65
+                
+            total = len(df)
+            
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'init', 'total': total})}\n\n"
+            
+            for idx, row in df.iterrows():
+                # Get Clip ID
+                try:
+                    clip_id = str(row.iloc[col_idx]).strip()
+                    if pd.isna(row.iloc[col_idx]) or not clip_id:
+                        continue
+                except:
+                    continue
+                    
+                row_result = BatchKunyeResult(
+                    row=idx + 2,
+                    clip_id=clip_id,
+                    status="processing"
+                )
+                
+                try:
+                    # Step 1: Image URL
+                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'url', 'message': 'Görsel URL oluşturuluyor...'})}\n\n"
+                    image_url = f"https://imgsrv.medyatakip.com/store/clip?gno={clip_id}"
+                    
+                    # Step 2: Download
+                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'download', 'message': 'Görsel indiriliyor...'})}\n\n"
+                    image_bytes = download_image(image_url)
+                    if not image_bytes:
+                        row_result.status = "failed"
+                        row_result.error = "Görsel indirilemedi"
+                        failed += 1
+                        results.append(row_result)
+                        yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Görsel indirilemedi'})}\n\n"
+                        continue
+                    
+                    # Step 3: OCR
+                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ocr', 'message': 'OCR işlemi yapılıyor...'})}\n\n"
+                    ocr_files = {"files": (f"{clip_id}.jpg", image_bytes, "image/jpeg")}
+                    
+                    try:
+                        ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
+                        if not ocr_response.ok:
+                            raise Exception(f"OCR HTTP {ocr_response.status_code}")
+                    except Exception as e:
+                        row_result.status = "failed"
+                        row_result.error = f"OCR Hatası: {str(e)}"
+                        failed += 1
+                        results.append(row_result)
+                        yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': f'OCR Hatası: {str(e)}'})}\n\n"
+                        continue
+                    
+                    ocr_data = ocr_response.json()
+                    ocr_text = ""
+                    if isinstance(ocr_data, list) and len(ocr_data) > 0:
+                        ocr_text = ocr_data[0].get("text", "")
+                    elif isinstance(ocr_data, dict):
+                        ocr_text = ocr_data.get("text", "")
+                    
+                    if not ocr_text or len(ocr_text.strip()) < 10:
+                        row_result.status = "failed"
+                        row_result.error = "OCR metni yetersiz"
+                        row_result.raw_ocr_text = ocr_text
+                        failed += 1
+                        results.append(row_result)
+                        yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR metni yetersiz'})}\n\n"
+                        continue
+                    
+                    row_result.raw_ocr_text = ocr_text
+                    
+                    # Step 4: OpenAI
+                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ai', 'message': 'Yapay zeka ile veri çıkarımı yapılıyor...'})}\n\n"
+                    client = openai.OpenAI(api_key=openai_api_key)
+                    prompt = create_kunye_prompt(ocr_text)
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "Sen yapılandırılmış veri çıkarımı yapan bir asistansın. Sadece geçerli JSON döndür."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=2000,
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    extracted_data = json.loads(response.choices[0].message.content)
+                    
+                    row_result.status = "success"
+                    row_result.data = KunyeResult(**extracted_data)
+                    successful += 1
+                    results.append(row_result)
+                    
+                    # Success notification
+                    yield f"data: {json.dumps({'type': 'success', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Başarıyla tamamlandı'})}\n\n"
+                    
+                    # Small delay for rate limiting
+                    await asyncio.sleep(0.3)
+                        
+                except Exception as e:
+                    print(f"[ERROR] Error processing {clip_id}: {e}")
+                    row_result.status = "failed"
+                    row_result.error = str(e)
+                    failed += 1
+                    results.append(row_result)
+                    yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': str(e)})}\n\n"
+            
+            # Send final summary
+            summary = {
+                'type': 'complete',
+                'total': total,
+                'processed': len(results),
+                'successful': successful,
+                'failed': failed,
+                'results': [r.dict() for r in results]
+            }
+            yield f"data: {json.dumps(summary)}\n\n"
+                
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Excel hatası: {str(e)}'})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+# Keep old endpoint for backward compatibility
 @app.post("/api/v1/pipelines/mbr-kunye-batch", response_model=BatchProcessingSummary)
 async def process_mbr_kunye_batch(
     file: UploadFile = File(...),
