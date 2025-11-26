@@ -392,7 +392,6 @@ function KunyeInterface() {
     const [results, setResults] = useState(null)
     const [error, setError] = useState(null)
     const [apiKey, setApiKey] = useState('')
-    const [useBatchAPI, setUseBatchAPI] = useState(false)
     const [showDocs, setShowDocs] = useState(false)
     const fileInputRef = useRef(null)
 
@@ -422,12 +421,7 @@ function KunyeInterface() {
         formData.append('id_column', 'A')
 
         try {
-            // Choose endpoint based on batch mode
-            const endpoint = useBatchAPI
-                ? '/api/v1/pipelines/mbr-kunye-batch-hybrid'
-                : '/api/v1/pipelines/mbr-kunye-batch'
-
-            const response = await fetch(endpoint, {
+            const response = await fetch('/api/v1/pipelines/mbr-kunye-batch', {
                 method: 'POST',
                 body: formData,
             })
@@ -437,53 +431,8 @@ function KunyeInterface() {
                 throw new Error(errorData.detail || `Server hatası: ${response.status}`)
             }
 
-            if (useBatchAPI) {
-                // Batch mode: Handle SSE stream
-                const reader = response.body.getReader()
-                const decoder = new TextDecoder()
-                let buffer = ''
-
-                while (true) {
-                    const { done, value } = await reader.read()
-                    if (done) break
-
-                    buffer += decoder.decode(value, { stream: true })
-                    const lines = buffer.split('\n\n')
-                    buffer = lines.pop() || ''
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            try {
-                                const data = JSON.parse(line.slice(6))
-                                console.log('[Batch SSE]', data.type, data)
-
-                                if (data.type === 'batch_submitted') {
-                                    // Got batch ID - show it
-                                    console.log('[Batch] Submitted! ID:', data.batch_id)
-                                    setResults({
-                                        _isBatch: true,
-                                        batch_id: data.batch_id,
-                                        status: data.status,
-                                        message: `✅ Batch işi oluşturuldu! ID: ${data.batch_id}`,
-                                        ocr_count: data.ocr_successful || 0
-                                    })
-                                    setLoading(false)
-                                    return
-                                } else if (data.type === 'error') {
-                                    console.error('[Batch] Error:', data.message)
-                                    throw new Error(data.message)
-                                }
-                            } catch (e) {
-                                console.error('SSE parse error:', e, 'Line:', line)
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Normal mode: JSON response
-                const data = await response.json()
-                setResults(data)
-            }
+            const data = await response.json()
+            setResults(data)
         } catch (err) {
             console.error('Error:', err)
             setError(err.message)
@@ -671,24 +620,6 @@ function KunyeInterface() {
                                 fontSize: '0.9rem'
                             }}
                         />
-
-                        {/* Batch API Toggle */}
-                        <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            marginTop: '1rem',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem'
-                        }}>
-                            <input
-                                type="checkbox"
-                                checked={useBatchAPI}
-                                onChange={(e) => setUseBatchAPI(e.target.checked)}
-                                style={{ cursor: 'pointer' }}
-                            />
-                            <span>Batch API kullan (💰 %50 ucuz, ⏰ 5-30 dk)</span>
-                        </label>
                     </div>
 
                     <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
@@ -812,49 +743,25 @@ function KunyeInterface() {
 
                     {results && !loading && (
                         <div>
-                            {/* Check if batch mode */}
-                            {results._isBatch ? (
-                                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
-                                    <h3 style={{ color: '#10b981', marginBottom: '1rem' }}>Batch İşi Oluşturuldu!</h3>
-                                    <div style={{ background: 'var(--surface-color)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
-                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Batch ID:</div>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 600, fontFamily: 'monospace', color: '#ec4899' }}>
-                                            {results.batch_id}
-                                        </div>
-                                    </div>
-                                    <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                                        {results.ocr_count} görsel OCR'dan geçti.<br />
-                                        OpenAI Batch API'sine gönderildi.<br />
-                                        ⏰ 5-30 dakika içinde tamamlanacak.
-                                    </p>
-                                    <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '0.5rem', fontSize: '0.85rem' }}>
-                                        💡 <strong>Not:</strong> Batch ID'yi kaydedin. Sonuçları daha sonra batch status endpoint'inden alabilirsiniz.
-                                    </div>
+                            {/* Summary */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>{results.total}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam</div>
                                 </div>
-                            ) : (
-                                <>
-                                    {/* Summary */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-                                        <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>{results.total}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam</div>
-                                        </div>
-                                        <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{results.successful}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Başarılı</div>
-                                        </div>
-                                        <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{results.failed}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hata</div>
-                                        </div>
-                                        <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ec4899' }}>{results.processed}</div>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>İşlenen</div>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{results.successful}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Başarılı</div>
+                                </div>
+                                <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{results.failed}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hata</div>
+                                </div>
+                                <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ec4899' }}>{results.processed}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>İşlenen</div>
+                                </div>
+                            </div>
 
                             {/* Results Preview - only for normal mode */}
                             {results.results && (
