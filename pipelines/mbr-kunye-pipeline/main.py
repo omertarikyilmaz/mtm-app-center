@@ -476,176 +476,195 @@ async def process_mbr_kunye_batch(
 
 # Batch API Endpoints
 
-@app.post("/api/v1/pipelines/mbr-kunye-batch-hybrid", response_model=BatchSubmissionResponse)
+@app.post("/api/v1/pipelines/mbr-kunye-batch-hybrid")
 async def process_mbr_kunye_batch_hybrid(
     file: UploadFile = File(...),
     openai_api_key: Optional[str] = Form(None),
     id_column: str = Form("A"),
 ):
     """
-    Hybrid approach: OCR synchronously with progress, then submit to OpenAI Batch API
-    Returns batch_id immediately after OCR phase completes
+    Hybrid approach with SSE: OCR synchronously with live progress, then submit to OpenAI Batch API
+    Returns batch_id via SSE after OCR phase completes
     """
+    from fastapi.responses import StreamingResponse
+    
     if not openai_api_key or not openai_api_key.strip():
         raise HTTPException(status_code=400, detail="OpenAI API Key gerekli.")
     
-    ocr_results = []
-    
-    try:
-        # Phase 1: Perform OCR (synchronously)
-        contents = await file.read()
-        df = pd.read_excel(BytesIO(contents))
+    async def event_generator():
+        ocr_results = []
         
-        col_idx = 0
-        if id_column.isalpha():
-            col_idx = ord(id_column.upper()) - 65
+        try:
+            # Phase 1: Perform OCR (with SSE progress)
+            contents = await file.read()
+            df = pd.read_excel(BytesIO(contents))
             
-        total = len(df)
-        print(f"[BATCH HYBRID] Processing {total} rows for OCR...")
-        
-        for idx, row in df.iterrows():
-            try:
-                clip_id = str(row.iloc[col_idx]).strip()
-                if pd.isna(row.iloc[col_idx]) or not clip_id:
+            col_idx = 0
+            if id_column.isalpha():
+                col_idx = ord(id_column.upper()) - 65
+                
+            total = len(df)
+            
+            # Send init
+            yield f"data: {json.dumps({'type': 'init', 'phase': 'ocr', 'total': total})}\n\n"
+            
+            for idx, row in df.iterrows():
+                try:
+                    clip_id = str(row.iloc[col_idx]).strip()
+                    if pd.isna(row.iloc[col_idx]) or not clip_id:
+                        continue
+                except:
                     continue
-            except:
-                continue
-                
-            try:
-                # Download & OCR
-                image_url = f"https://imgsrv.medyatakip.com/store/clip?gno={clip_id}"
-                image_bytes = download_image(image_url)
-                
-                if not image_bytes:
-                    ocr_results.append({
-                        "custom_id": f"clip-{clip_id}",
-                        "clip_id": clip_id,
-                        "row": idx + 2,
-                        "ocr_text": None,
-                        "error": "Görsel indirilemedi"
-                    })
-                    continue
-                
-                ocr_files = {"files": (f"{clip_id}.jpg", image_bytes, "image/jpeg")}
-                ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
-                
-                if not ocr_response.ok:
-                    ocr_results.append({
-                        "custom_id": f"clip-{clip_id}",
-                        "clip_id": clip_id,
-                        "row": idx + 2,
-                        "ocr_text": None,
-                        "error": f"OCR HTTP {ocr_response.status_code}"
-                    })
-                    continue
-                
-                ocr_data = ocr_response.json()
-                ocr_text = ""
-                if isinstance(ocr_data, list) and len(ocr_data) > 0:
-                    ocr_text = ocr_data[0].get("text", "")
-                elif isinstance(ocr_data, dict):
-                    ocr_text = ocr_data.get("text", "")
-                
-                if not ocr_text or len(ocr_text.strip()) < 10:
+                    
+                try:
+                    # Download
+                    yield f"data: {json.dumps({'type': 'progress', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'download', 'message': 'Görsel indiriliyor...'})}\n\n"
+                    image_url = f"https://imgsrv.medyatakip.com/store/clip?gno={clip_id}"
+                    image_bytes = download_image(image_url)
+                    
+                    if not image_bytes:
+                        ocr_results.append({
+                            "custom_id": f"clip-{clip_id}",
+                            "clip_id": clip_id,
+                            "row": idx + 2,
+                            "ocr_text": None,
+                            "error": "Görsel indirilemedi"
+                        })
+                        yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Görsel indirilemedi'})}\n\n"
+                        continue
+                    
+                    # OCR
+                    yield f"data: {json.dumps({'type': 'progress', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ocr', 'message': 'OCR işleniyor...'})}\n\n"
+                    ocr_files = {"files": (f"{clip_id}.jpg", image_bytes, "image/jpeg")}
+                    ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
+                    
+                    if not ocr_response.ok:
+                        ocr_results.append({
+                            "custom_id": f"clip-{clip_id}",
+                            "clip_id": clip_id,
+                            "row": idx + 2,
+                            "ocr_text": None,
+                            "error": f"OCR HTTP {ocr_response.status_code}"
+                        })
+                        yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': f'OCR hatası'})}\n\n"
+                        continue
+                    
+                    ocr_data = ocr_response.json()
+                    ocr_text = ""
+                    if isinstance(ocr_data, list) and len(ocr_data) > 0:
+                        ocr_text = ocr_data[0].get("text", "")
+                    elif isinstance(ocr_data, dict):
+                        ocr_text = ocr_data.get("text", "")
+                    
+                    if not ocr_text or len(ocr_text.strip()) < 10:
+                        ocr_results.append({
+                            "custom_id": f"clip-{clip_id}",
+                            "clip_id": clip_id,
+                            "row": idx + 2,
+                            "ocr_text": ocr_text,
+                            "error": "OCR metni yetersiz"
+                        })
+                        yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR metni yetersiz'})}\n\n"
+                        continue
+                    
                     ocr_results.append({
                         "custom_id": f"clip-{clip_id}",
                         "clip_id": clip_id,
                         "row": idx + 2,
                         "ocr_text": ocr_text,
-                        "error": "OCR metni yetersiz"
+                        "error": None
                     })
-                    continue
-                
-                ocr_results.append({
-                    "custom_id": f"clip-{clip_id}",
-                    "clip_id": clip_id,
-                    "row": idx + 2,
-                    "ocr_text": ocr_text,
-                    "error": None
+                    
+                    yield f"data: {json.dumps({'type': 'success', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR tamamlandı'})}\n\n"
+                    
+                except Exception as e:
+                    print(f"[ERROR] OCR failed for {clip_id}: {e}")
+                    ocr_results.append({
+                        "custom_id": f"clip-{clip_id}",
+                        "clip_id": clip_id,
+                        "row": idx + 2,
+                        "ocr_text": None,
+                        "error": str(e)
+                    })
+                    yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': str(e)})}\n\n"
+            
+            # Phase 2: Create Batch
+            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': 'Batch dosyası hazırlanıyor...'})}\n\n"
+            
+            successful_ocr = [r for r in ocr_results if r["ocr_text"] and not r["error"]]
+            
+            if not successful_ocr:
+                yield f"data: {json.dumps({'type': 'error', 'phase': 'batch', 'message': 'Hiçbir OCR başarılı olmadı'})}\n\n"
+                return
+            
+            # Create JSONL for batch
+            batch_requests = []
+            for ocr_result in successful_ocr:
+                prompt = create_kunye_prompt(ocr_result["ocr_text"])
+                batch_requests.append({
+                    "custom_id": ocr_result["custom_id"],
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            {"role": "system", "content": "Sen yapılandırılmış veri çıkarımı yapan bir asistansın. Sadece geçerli JSON döndür."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 2000,
+                        "response_format": {"type": "json_object"}
+                    }
                 })
+            
+            # Write to temporary file
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+                for req in batch_requests:
+                    f.write(json.dumps(req) + '\n')
+                batch_file_path = f.name
+            
+            # Upload to OpenAI
+            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': 'OpenAI\'a yükleniyor...'})}\n\n"
+            client = openai.OpenAI(api_key=openai_api_key)
+            
+            with open(batch_file_path, 'rb') as f:
+                batch_input_file = client.files.create(file=f, purpose="batch")
+            
+            # Create batch job
+            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': 'Batch job oluşturuluyor...'})}\n\n"
+            batch_job = client.batches.create(
+                input_file_id=batch_input_file.id,
+                endpoint="/v1/chat/completions",
+                completion_window="24h"
+            )
+            
+            # Clean up temp file
+            os.unlink(batch_file_path)
+            
+            # Store batch info
+            active_batches[batch_job.id] = {
+                "batch_id": batch_job.id,
+                "openai_api_key": openai_api_key,
+                "ocr_results": ocr_results,
+                "created_at": batch_job.created_at,
+                "status": batch_job.status
+            }
+            
+            # Send completion
+            yield f"data: {json.dumps({'type': 'batch_submitted', 'batch_id': batch_job.id, 'status': batch_job.status, 'successful_ocr': len(successful_ocr), 'message': f'Batch gönderildi! ID: {batch_job.id}'})}\n\n"
                 
-                print(f"[BATCH HYBRID] [{idx+1}/{total}] OCR completed for {clip_id}")
-                
-            except Exception as e:
-                print(f"[ERROR] OCR failed for {clip_id}: {e}")
-                ocr_results.append({
-                    "custom_id": f"clip-{clip_id}",
-                    "clip_id": clip_id,
-                    "row": idx + 2,
-                    "ocr_text": None,
-                    "error": str(e)
-                })
-        
-        # Phase 2: Create Batch API request file
-        successful_ocr = [r for r in ocr_results if r["ocr_text"] and not r["error"]]
-        
-        if not successful_ocr:
-            raise HTTPException(status_code=400, detail="Hiçbir OCR başarılı olmadı")
-        
-        # Create JSONL for batch
-        batch_requests = []
-        for ocr_result in successful_ocr:
-            prompt = create_kunye_prompt(ocr_result["ocr_text"])
-            batch_requests.append({
-                "custom_id": ocr_result["custom_id"],
-                "method": "POST",
-                "url": "/v1/chat/completions",
-                "body": {
-                    "model": "gpt-4o-mini",
-                    "messages": [
-                        {"role": "system", "content": "Sen yapılandırılmış veri çıkarımı yapan bir asistansın. Sadece geçerli JSON döndür."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.1,
-                    "max_tokens": 2000,
-                    "response_format": {"type": "json_object"}
-                }
-            })
-        
-        # Write to temporary file
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
-            for req in batch_requests:
-                f.write(json.dumps(req) + '\n')
-            batch_file_path = f.name
-        
-        # Upload to OpenAI
-        client = openai.OpenAI(api_key=openai_api_key)
-        
-        with open(batch_file_path, 'rb') as f:
-            batch_input_file = client.files.create(file=f, purpose="batch")
-        
-        # Create batch job
-        batch_job = client.batches.create(
-            input_file_id=batch_input_file.id,
-            endpoint="/v1/chat/completions",
-            completion_window="24h"
-        )
-        
-        # Clean up temp file
-        os.unlink(batch_file_path)
-        
-        # Store batch info
-        active_batches[batch_job.id] = {
-            "batch_id": batch_job.id,
-            "openai_api_key": openai_api_key,
-            "ocr_results": ocr_results,
-            "created_at": batch_job.created_at,
-            "status": batch_job.status
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Hata: {str(e)}'})}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
         }
-        
-        print(f"[BATCH HYBRID] Batch created: {batch_job.id}")
-        
-        return BatchSubmissionResponse(
-            batch_id=batch_job.id,
-            status=batch_job.status,
-            message=f"{len(successful_ocr)} OCR başarılı. Batch OpenAI'a gönderildi. Batch ID: {batch_job.id}",
-            ocr_results=ocr_results
-        )
-        
-    except Exception as e:
-        print(f"[ERROR] Batch hybrid error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    )
 
 @app.get("/api/v1/pipelines/mbr-kunye-batch-status/{batch_id}", response_model=BatchJobStatus)
 async def get_batch_status(batch_id: str):
