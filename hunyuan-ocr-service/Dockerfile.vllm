@@ -12,8 +12,11 @@ RUN apt-get update && apt-get install -y \
 # Install vLLM NIGHTLY build (required for HunyuanOCR support)
 RUN pip install --no-cache-dir -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
 
-# Install transformers and other dependencies
-RUN pip install --no-cache-dir transformers pillow accelerate
+# Install Transformers from source (required for hunyuan_vl model type)
+RUN pip install --no-cache-dir git+https://github.com/huggingface/transformers.git
+
+# Install other dependencies
+RUN pip install --no-cache-dir pillow accelerate
 
 # Pre-download the model tokenizer and processor
 RUN python -c "from transformers import AutoTokenizer, AutoProcessor; \
