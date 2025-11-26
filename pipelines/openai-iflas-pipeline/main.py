@@ -366,11 +366,12 @@ async def process_iflas_batch_from_excel(
                 if not ocr_text or len(ocr_text.strip()) < 10:
                     row_result.status = "failed"
                     row_result.error = "OCR metni çok kısa veya boş"
-                    row_result.raw_ocr_text = ocr_text
+                    row_result.raw_ocr_text = ocr_text  # Save even if short
                     failed += 1
                     results.append(row_result)
                     continue
                 
+                # Store raw OCR text in result (birebir görsel yükleme ile aynı)
                 row_result.raw_ocr_text = ocr_text
                 
                 # Step 4: Extract structured data with OpenAI
