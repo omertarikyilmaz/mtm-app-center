@@ -555,29 +555,32 @@ function IflasOCRInterface() {
     const exportToExcel = () => {
         if (!excelResults || !excelResults.results) return
 
-        // Match columns with image upload results (IflasResult model)
+        // Match columns exactly as requested by user
         const headers = [
-            'Satır No', 'Clip ID', 'Durum',
-            'Ad/Soyad/Ünvan', 'TCKN', 'VKN', 'Adres',
-            'İcra/İflas Müdürlüğü', 'Dosya Yılı', 'İlan Türü',
-            'İlan Tarihi', 'Davacılar', 'Kaynak', 'Ham OCR Metni'
+            "AD SOYAD / UNVAN", "TCKN / YKN", "VKN", "ADRES",
+            "İCRA/İFLAS MÜDÜRLÜĞÜ", "İLAN TÜRÜ", "DOSYA YILI", "TARİH",
+            "1. DAVACI", "2. DAVACI", "3. DAVACI", "4. DAVACI", "5. DAVACI", "6. DAVACI", "7. DAVACI",
+            "DOSYA NO", "BİLGİ KAYNAĞI"
         ]
 
         const rows = excelResults.results.map(r => [
-            r.row,
-            r.clip_id,
-            r.status === 'success' ? 'Başarılı' : 'Hata',
             r.data?.ad_soyad_unvan || '',
             r.data?.tckn || '',
             r.data?.vkn || '',
             r.data?.adres || '',
             r.data?.icra_iflas_mudurlugu || '',
-            r.data?.dosya_yili || '',
             r.data?.ilan_turu || '',
+            r.data?.dosya_yili || '',
             r.data?.ilan_tarihi || '',
-            r.data?.davacilar ? r.data.davacilar.join(', ') : '',
-            r.data?.kaynak || '',
-            r.raw_ocr_text || ''
+            r.data?.davaci_1 || '',
+            r.data?.davaci_2 || '',
+            r.data?.davaci_3 || '',
+            r.data?.davaci_4 || '',
+            r.data?.davaci_5 || '',
+            r.data?.davaci_6 || '',
+            r.data?.davaci_7 || '',
+            r.data?.dosya_no || '',
+            r.data?.kaynak || ''
         ])
 
         // Create Excel file using SheetJS (XLSX)

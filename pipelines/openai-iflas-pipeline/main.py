@@ -48,10 +48,17 @@ class IflasResult(BaseModel):
     vkn: Optional[str] = None
     adres: Optional[str] = None
     icra_iflas_mudurlugu: Optional[str] = None
-    dosya_yili: Optional[str] = None
     ilan_turu: Optional[str] = None
+    dosya_yili: Optional[str] = None
     ilan_tarihi: Optional[str] = None
-    davacilar: Optional[List[str]] = None
+    davaci_1: Optional[str] = None
+    davaci_2: Optional[str] = None
+    davaci_3: Optional[str] = None
+    davaci_4: Optional[str] = None
+    davaci_5: Optional[str] = None
+    davaci_6: Optional[str] = None
+    davaci_7: Optional[str] = None
+    dosya_no: Optional[str] = None
     kaynak: Optional[str] = None
     raw_ocr_text: Optional[str] = None
     confidence: Optional[str] = None
@@ -64,43 +71,55 @@ def create_extraction_prompt(ocr_text: str) -> str:
 Aşağıdaki OCR metni bir gazete sayfasından çıkarılmış iflas/icra ilanı içermektedir.
 Bu metinden aşağıdaki alanları hassas bir şekilde çıkar. Eğer bir alan bulunamazsa, o alan için null döndür.
 
-**ALANLAR VE AÇIKLAMALAR:**
+**İSTENEN ALANLAR:**
 
-1. **ad_soyad_unvan**: İflas/icra konusu olan kişi veya kurumun tam adı
-2. **tckn**: TC Kimlik No (sadece 11 haneli, kişiler için)
-3. **vkn**: Vergi Kimlik No (sadece 10 haneli, kurumlar için)
-4. **adres**: Kişi veya kurumun tam adresi
-5. **icra_iflas_mudurlugu**: İlandaki icra/iflas müdürlüğünün tam adı ve şehri
-6. **dosya_yili**: Dosyanın yılı (sadece yıl, örn: "2024")
-7. **ilan_turu**: İlan türü (örn: "Haciz İlanı", "İflas İlanı", "Satış İlanı", "Tahliye İlanı", "Ödeme Emri İlanı")
-8. **ilan_tarihi**: İlanın yayınlandığı tarih (GG.AA.YYYY formatında)
-9. **davacilar**: Davacıların isimleri (liste olarak, yoksa null)
-10. **kaynak**: İlanın yayınlandığı gazete adı ve sayfa numarası (örn: "AKŞAM/SYF5")
+1. **ad_soyad_unvan**: İflas/icra konusu olan kişi veya kurumun tam adı ("AD SOYAD / UNVAN")
+2. **tckn**: TC Kimlik No (sadece 11 haneli, kişiler için) ("TCKN / YKN")
+3. **vkn**: Vergi Kimlik No (sadece 10 haneli, kurumlar için) ("VKN")
+4. **adres**: Kişi veya kurumun tam adresi ("ADRES")
+5. **icra_iflas_mudurlugu**: İlandaki icra/iflas müdürlüğünün tam adı ve şehri ("İCRA/İFLAS MÜDÜRLÜĞÜ")
+6. **ilan_turu**: İlan türü (örn: "Haciz İlanı", "İflas İlanı", "Satış İlanı") ("İLAN TÜRÜ")
+7. **dosya_yili**: Dosyanın yılı (sadece yıl, örn: "2024") ("DOSYA YILI")
+8. **ilan_tarihi**: İlanın yayınlandığı tarih (GG.AA.YYYY formatında) ("TARİH")
+9. **davaci_1**: Birinci davacı/alacaklı adı ("1. DAVACI")
+10. **davaci_2**: İkinci davacı/alacaklı adı ("2. DAVACI")
+11. **davaci_3**: Üçüncü davacı/alacaklı adı ("3. DAVACI")
+12. **davaci_4**: Dördüncü davacı/alacaklı adı ("4. DAVACI")
+13. **davaci_5**: Beşinci davacı/alacaklı adı ("5. DAVACI")
+14. **davaci_6**: Altıncı davacı/alacaklı adı ("6. DAVACI")
+15. **davaci_7**: Yedinci davacı/alacaklı adı ("7. DAVACI")
+16. **dosya_no**: İcra/İflas dosya numarası (örn: "2024/123 Esas") ("DOSYA NO")
+17. **kaynak**: İlanın yayınlandığı gazete adı ve sayfa numarası ("BİLGİ KAYNAĞI")
 
 **KURALLAR:**
 - TC Kimlik No mutlaka 11 haneli olmalı
 - Vergi Kimlik No mutlaka 10 haneli olmalı
 - Tarihleri GG.AA.YYYY formatında döndür
+- Davacıları sırasıyla doldur. Eğer 7'den az davacı varsa, geri kalanları null bırak.
 - Eğer bir bilgi metinde yoksa veya belirsizse, o alan için null döndür
 - Kesinlikle sadece geçerli JSON formatında yanıt ver, hiçbir açıklama ekleme
-- Davacılar listesi boşsa null döndür
-- İlan türünü yukarıdaki örneklerden birine benzer şekilde sınıflandır
 
 **OCR METNİ:**
 {ocr_text}
 
-**ÇIKTI:**
-Aşağıdaki JSON şemasını kullanarak yanıt ver:
+**ÇIKTI JSON ŞEMASI:**
 {{
   "ad_soyad_unvan": "string veya null",
-  "tckn": "string (11 haneli) veya null",
-  "vkn": "string (10 haneli) veya null",
+  "tckn": "string veya null",
+  "vkn": "string veya null",
   "adres": "string veya null",
   "icra_iflas_mudurlugu": "string veya null",
-  "dosya_yili": "string veya null",
   "ilan_turu": "string veya null",
-  "ilan_tarihi": "string (GG.AA.YYYY) veya null",
-  "davacilar": ["string"] veya null,
+  "dosya_yili": "string veya null",
+  "ilan_tarihi": "string veya null",
+  "davaci_1": "string veya null",
+  "davaci_2": "string veya null",
+  "davaci_3": "string veya null",
+  "davaci_4": "string veya null",
+  "davaci_5": "string veya null",
+  "davaci_6": "string veya null",
+  "davaci_7": "string veya null",
+  "dosya_no": "string veya null",
   "kaynak": "string veya null"
 }}"""
 
