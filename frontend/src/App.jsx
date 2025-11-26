@@ -168,85 +168,20 @@ function KunyeInterface() {
         formData.append('id_column', 'A')
 
         try {
-            const response = await fetch('/api/v1/pipelines/mbr-kunye-batch-stream', {
+            const response = await fetch('/api/v1/pipelines/mbr-kunye-batch', {
                 method: 'POST',
                 body: formData,
             })
 
             if (!response.ok) {
-                let errorMsg = 'İşlem başarısız oldu'
-                try {
-                    const errorData = await response.json()
-                    errorMsg = errorData.detail || errorMsg
-                } catch {
-                    errorMsg = `Server hatası: ${response.status} ${response.statusText}`
-                }
-                throw new Error(errorMsg)
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Server hatası: ${response.status}`)
             }
 
-            // Process SSE stream
-            const reader = response.body.getReader()
-            const decoder = new TextDecoder()
-            let buffer = ''
-            let currentProgress = {
-                current: 0,
-                total: 0,
-                step: '',
-                message: '',
-                clip_id: ''
-            }
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) {
-                    console.log('Stream completed')
-                    break
-                }
-
-                buffer += decoder.decode(value, { stream: true })
-                const lines = buffer.split('\n\n')
-                buffer = lines.pop() || ''
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6))
-
-                            if (data.type === 'init') {
-                                currentProgress.total = data.total
-                                setResults({ _progress: currentProgress })
-                            } else if (data.type === 'progress' || data.type === 'success' || data.type === 'error') {
-                                currentProgress = {
-                                    current: data.row || currentProgress.current,
-                                    total: data.total || currentProgress.total,
-                                    step: data.step || '',
-                                    message: data.message || '',
-                                    clip_id: data.clip_id || currentProgress.clip_id
-                                }
-                                setResults(prev => ({
-                                    ...prev,
-                                    _progress: currentProgress
-                                }))
-                            } else if (data.type === 'complete') {
-                                // Stream complete - set final results
-                                setResults({
-                                    total: data.total,
-                                    processed: data.processed,
-                                    successful: data.successful,
-                                    failed: data.failed,
-                                    results: data.results
-                                })
-                                setLoading(false) // Clear loading immediately on complete
-                                return // Exit early
-                            }
-                        } catch (e) {
-                            console.error('Failed to parse SSE data:', e, line)
-                        }
-                    }
-                }
-            }
+            const data = await response.json()
+            setResults(data)
         } catch (err) {
-            console.error('Stream error:', err)
+            console.error('Error:', err)
             setError(err.message)
         } finally {
             setLoading(false)
