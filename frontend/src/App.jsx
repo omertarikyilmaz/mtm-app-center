@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
-import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users } from 'lucide-react'
-import Documentation from './Documentation'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle } from 'lucide-react'
 import './index.css'
 
 function App() {
@@ -25,8 +24,6 @@ function App() {
                 <KunyeInterface />
             ) : currentView === 'chat' ? (
                 <ChatInterface />
-            ) : currentView === 'documentation' ? (
-                <Documentation />
             ) : null}
 
             {currentView !== 'dashboard' && (
@@ -43,6 +40,8 @@ function App() {
 }
 
 function Dashboard({ onViewChange }) {
+    const [showDocs, setShowDocs] = useState(false)
+
     const apps = [
         {
             id: 'ocr',
@@ -76,7 +75,66 @@ function Dashboard({ onViewChange }) {
     ]
 
     return (
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+            {/* Documentation Button - Top Right */}
+            <button
+                onClick={() => setShowDocs(!showDocs)}
+                style={{
+                    position: 'absolute',
+                    top: '-4rem',
+                    right: 0,
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    color: '#6366f1',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 500
+                }}
+            >
+                <HelpCircle size={18} /> Dokümantasyon
+            </button>
+
+            {/* Documentation Modal */}
+            {showDocs && (
+                <div style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'var(--bg-color)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '1rem',
+                    padding: '2rem',
+                    width: '90%',
+                    maxWidth: '600px',
+                    maxHeight: '80vh',
+                    overflow: 'auto',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+                    zIndex: 2000
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>📚 API Dokümantasyonu</h2>
+                        <button onClick={() => setShowDocs(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+                    </div>
+                    <div style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>
+                        <h3 style={{ color: '#f59e0b', marginTop: '1rem' }}>DeepSeek OCR API</h3>
+                        <p><code>POST /api/v1/ocr</code> - Gelişmiş OCR servisi</p>
+
+                        <h3 style={{ color: '#f59e0b', marginTop: '1rem' }}>OpenAI İflas OCR</h3>
+                        <p><code>POST /api/v1/pipelines/iflas-batch</code> - İflas/icra ilanı analizi</p>
+
+                        <h3 style={{ color: '#ec4899', marginTop: '1rem' }}>MBR Künye Pipeline</h3>
+                        <p><code>POST /api/v1/pipelines/mbr-kunye-batch</code> - Normal mod (hızlı)</p>
+                        <p><code>POST /api/v1/pipelines/mbr-kunye-batch-hybrid</code> - Batch API modu (ucuz, yavaş)</p>
+                    </div>
+                </div>
+            )}
+            {showDocs && <div onClick={() => setShowDocs(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1999 }} />}
             <div style={{ marginBottom: '3rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
                 {apps.map((app) => (
                     <div
@@ -111,22 +169,6 @@ function Dashboard({ onViewChange }) {
                         <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>{app.description}</p>
                     </div>
                 ))}
-
-                <div
-                    className="glass-panel"
-                    style={{ padding: '2rem', cursor: 'pointer', transition: 'all 0.2s' }}
-                    onClick={() => onViewChange('documentation')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                        <div style={{ background: 'var(--surface-color)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                            <FileText size={32} color="#8b5cf6" />
-                        </div>
-                        <div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>API Dokümantasyonu</h3>
-                        </div>
-                    </div>
-                    <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>Tüm servislerin API kullanımı, endpoint'ler ve örnekler</p>
-                </div>
             </div>
         </div>
     )
