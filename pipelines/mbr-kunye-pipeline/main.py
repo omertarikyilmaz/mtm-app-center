@@ -625,14 +625,16 @@ async def process_mbr_kunye_batch_hybrid(
                 batch_file_path = f.name
             
             # Upload to OpenAI
-            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': 'OpenAI\'a yükleniyor...'})}\n\n"
+            msg1 = "OpenAI'a yükleniyor..."
+            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': msg1})}\n\n"
             client = openai.OpenAI(api_key=openai_api_key)
             
             with open(batch_file_path, 'rb') as f:
                 batch_input_file = client.files.create(file=f, purpose="batch")
             
             # Create batch job
-            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': 'Batch job oluşturuluyor...'})}\n\n"
+            msg2 = "Batch job oluşturuluyor..."
+            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': msg2})}\n\n"
             batch_job = client.batches.create(
                 input_file_id=batch_input_file.id,
                 endpoint="/v1/chat/completions",
