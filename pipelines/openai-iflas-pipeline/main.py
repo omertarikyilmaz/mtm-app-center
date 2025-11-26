@@ -358,13 +358,32 @@ async def process_iflas_batch_from_excel(
                     continue
                 
                 # Step 3: Perform OCR
-                print(f"[{idx}/{total}] Performing OCR...")
+                print(f"[{idx}/{total}] Performing OCR with URL: {DEEPSEEK_OCR_URL}")
                 ocr_files = {"files": (f"{clip_id}.jpg", image_bytes, "image/jpeg")}
-                ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
                 
-                if not ocr_response.ok:
+                try:
+                    ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
+                    
+                    if not ocr_response.ok:
+                        row_result.status = "failed"
+                        row_result.error = f"OCR başarısız (HTTP {ocr_response.status_code})"
+                        failed += 1
+                        results.append(row_result)
+                        continue
+                        
+                except requests.exceptions.ConnectionError:
+                    error_msg = f"OCR servisine bağlanılamadı ({DEEPSEEK_OCR_URL}). Servis ayakta mı?"
+                    print(f"[ERROR] {error_msg}")
                     row_result.status = "failed"
-                    row_result.error = f"OCR başarısız (HTTP {ocr_response.status_code})"
+                    row_result.error = error_msg
+                    failed += 1
+                    results.append(row_result)
+                    continue
+                except Exception as e:
+                    error_msg = f"OCR hatası: {str(e)}"
+                    print(f"[ERROR] {error_msg}")
+                    row_result.status = "failed"
+                    row_result.error = error_msg
                     failed += 1
                     results.append(row_result)
                     continue
