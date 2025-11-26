@@ -193,107 +193,24 @@ async def process_iflas_notice(
 # Helper functions for Excel batch processing
 def extract_image_url_from_medyatakip(clip_id: str) -> Optional[str]:
     """
-    Extracts image URL from medyatakip.com clip page.
+    Constructs direct image URL from medyatakip GNO (clip ID).
+    
+    The image URL pattern is: https://imgsrv.medyatakip.com/store/clip?gno={GNO}
     
     Args:
-        clip_id: The clip ID from Excel (e.g., '2025110000041301')
+        clip_id: The GNO (clip ID) from Excel (e.g., '2025110000041301')
     
     Returns:
-        Image URL or None if not found
+        Direct image URL
     """
     try:
-        # Construct the clip URL
-        clip_url = f"https://clips.medyatakip.com/pm/clip/{clip_id}"
-        print(f"[DEBUG] Fetching URL: {clip_url}")
-        
-        # Fetch the page with proper headers
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(clip_url, headers=headers, timeout=30)
-        response.raise_for_status()
-        print(f"[DEBUG] Response status: {response.status_code}")
-        
-        # Parse HTML
-        soup = BeautifulSoup(response.content, 'lxml')
-        
-        # Try multiple methods to find the image
-        # 1. First try the specific class for medyatakip
-        img = soup.find('img', class_='showingImage')
-        if img:
-            print(f"[DEBUG] Found img with class='showingImage'")
-            src = img.get('data-src') or img.get('src') or img.get('data-original')
-            if src:
-                print(f"[DEBUG] Image src: {src}")
-                # Return absolute URL
-                if src.startswith('http'):
-                    return src
-                else:
-                    # Join with base URL
-                    from urllib.parse import urljoin
-                    absolute_url = urljoin(clip_url, src)
-                    print(f"[DEBUG] Converted to absolute: {absolute_url}")
-                    return absolute_url
-        else:
-            print(f"[DEBUG] No img with class='showingImage' found")
-        
-        # 2. If specific class not found, search all images with priority
-        img_tags = soup.find_all('img')
-        print(f"[DEBUG] Found {len(img_tags)} total img tags")
-        candidate_images = []
-        
-        for img in img_tags:
-            src = img.get('src') or img.get('data-src') or img.get('data-lazy-src') or img.get('data-original')
-            if not src:
-                continue
-            
-            # Filter out logos and small icons
-            src_lower = src.lower()
-            if any(exclude in src_lower for exclude in ['logo', 'icon', 'button', 'nav', 'menu', 'header', 'footer']):
-                continue
-            
-            # Prioritize clip/image URLs
-            priority = 0
-            if any(keyword in src_lower for keyword in ['clip', 'kupur', 'image', 'img', 'photo', 'gorsel', 'store']):
-                priority = 2
-            elif any(keyword in src_lower for keyword in ['jpg', 'jpeg', 'png', 'gif', 'webp']):
-                priority = 1
-            
-            # Check width and height (prefer larger images)
-            width = img.get('width')
-            height = img.get('height')
-            if width and height:
-                try:
-                    w, h = int(width), int(height)
-                    if w > 200 and h > 200:
-                        priority += 1
-                except:
-                    pass
-            
-            candidate_images.append((priority, src))
-        
-        print(f"[DEBUG] Found {len(candidate_images)} candidate images after filtering")
-        
-        # Sort by priority and return highest
-        if candidate_images:
-            candidate_images.sort(reverse=True, key=lambda x: x[0])
-            src = candidate_images[0][1]
-            print(f"[DEBUG] Selected image (priority={candidate_images[0][0]}): {src}")
-            if src.startswith('http'):
-                return src
-            else:
-                from urllib.parse import urljoin
-                absolute_url = urljoin(clip_url, src)
-                print(f"[DEBUG] Converted to absolute: {absolute_url}")
-                return absolute_url
-        
-        print(f"[WARNING] No suitable image found for clip ID {clip_id}")
-        return None
+        # Direct image URL from GNO - no scraping needed!
+        image_url = f"https://imgsrv.medyatakip.com/store/clip?gno={clip_id}"
+        print(f"[DEBUG] Direct image URL for GNO {clip_id}: {image_url}")
+        return image_url
         
     except Exception as e:
-        print(f"[ERROR] Error extracting image from {clip_id}: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"[ERROR] Error constructing image URL from {clip_id}: {e}")
         return None
 
 
