@@ -619,9 +619,9 @@ async def process_mbr_kunye_batch_hybrid(
             
             # Write to temporary file
             import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False, encoding='utf-8') as f:
                 for req in batch_requests:
-                    f.write(json.dumps(req) + '\n')
+                    f.write(json.dumps(req, ensure_ascii=False) + '\n')
                 batch_file_path = f.name
             
             # Upload to OpenAI
