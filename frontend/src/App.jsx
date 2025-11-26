@@ -437,19 +437,48 @@ function KunyeInterface() {
                 throw new Error(errorData.detail || `Server hatası: ${response.status}`)
             }
 
-            const data = await response.json()
-
             if (useBatchAPI) {
-                // Batch mode: show batch ID
-                setResults({
-                    _isBatch: true,
-                    batch_id: data.batch_id,
-                    status: data.status,
-                    message: data.message,
-                    ocr_count: data.ocr_results?.filter(r => !r.error).length || 0
-                })
+                // Batch mode: Handle SSE stream
+                const reader = response.body.getReader()
+                const decoder = new TextDecoder()
+                let buffer = ''
+
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    buffer += decoder.decode(value, { stream: true })
+                    const lines = buffer.split('\n\n')
+                    buffer = lines.pop() || ''
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6))
+
+                                if (data.type === 'batch_submitted') {
+                                    // Got batch ID - show it
+                                    setResults({
+                                        _isBatch: true,
+                                        batch_id: data.batch_id,
+                                        status: data.status,
+                                        message: `✅ Batch işi oluşturuldu! ID: ${data.batch_id}`,
+                                        ocr_count: data.ocr_successful || 0
+                                    })
+                                    setLoading(false)
+                                    return
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.message)
+                                }
+                            } catch (e) {
+                                console.error('SSE parse error:', e)
+                            }
+                        }
+                    }
+                }
             } else {
-                // Normal mode: show results
+                // Normal mode: JSON response
+                const data = await response.json()
                 setResults(data)
             }
         } catch (err) {
