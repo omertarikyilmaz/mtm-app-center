@@ -205,18 +205,73 @@ def extract_image_url_from_medyatakip(clip_id: str) -> Optional[str]:
         # Construct the clip URL
         clip_url = f"https://clips.medyatakip.com/pm/clip/{clip_id}"
         
-        # Fetch the page
-        response = requests.get(clip_url, timeout=15)
+        # Fetch the page with proper headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(clip_url, headers=headers, timeout=30)
         response.raise_for_status()
         
         # Parse HTML
         soup = BeautifulSoup(response.content, 'lxml')
         
-        # Find img with class="showingImage"
+        # Try multiple methods to find the image
+        # 1. First try the specific class for medyatakip
         img = soup.find('img', class_='showingImage')
+        if img:
+            src = img.get('data-src') or img.get('src') or img.get('data-original')
+            if src:
+                # Return absolute URL
+                if src.startswith('http'):
+                    return src
+                else:
+                    # Join with base URL
+                    from urllib.parse import urljoin
+                    return urljoin(clip_url, src)
         
-        if img and img.get('data-src'):
-            return img['data-src']
+        # 2. If specific class not found, search all images with priority
+        img_tags = soup.find_all('img')
+        candidate_images = []
+        
+        for img in img_tags:
+            src = img.get('src') or img.get('data-src') or img.get('data-lazy-src') or img.get('data-original')
+            if not src:
+                continue
+            
+            # Filter out logos and small icons
+            src_lower = src.lower()
+            if any(exclude in src_lower for exclude in ['logo', 'icon', 'button', 'nav', 'menu', 'header', 'footer']):
+                continue
+            
+            # Prioritize clip/image URLs
+            priority = 0
+            if any(keyword in src_lower for keyword in ['clip', 'kupur', 'image', 'img', 'photo', 'gorsel', 'store']):
+                priority = 2
+            elif any(keyword in src_lower for keyword in ['jpg', 'jpeg', 'png', 'gif', 'webp']):
+                priority = 1
+            
+            # Check width and height (prefer larger images)
+            width = img.get('width')
+            height = img.get('height')
+            if width and height:
+                try:
+                    w, h = int(width), int(height)
+                    if w > 200 and h > 200:
+                        priority += 1
+                except:
+                    pass
+            
+            candidate_images.append((priority, src))
+        
+        # Sort by priority and return highest
+        if candidate_images:
+            candidate_images.sort(reverse=True, key=lambda x: x[0])
+            src = candidate_images[0][1]
+            if src.startswith('http'):
+                return src
+            else:
+                from urllib.parse import urljoin
+                return urljoin(clip_url, src)
         
         print(f"Warning: No image found for clip ID {clip_id}")
         return None
