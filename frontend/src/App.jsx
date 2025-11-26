@@ -432,12 +432,20 @@ function IflasOCRInterface() {
                 body: formData,
             })
 
-            const data = await response.json()
-
             if (!response.ok) {
-                throw new Error(data.detail || 'İşlem başarısız oldu')
+                // Try to get error message from response
+                let errorMsg = 'İşlem başarısız oldu'
+                try {
+                    const errorData = await response.json()
+                    errorMsg = errorData.detail || errorMsg
+                } catch {
+                    // If JSON parse fails, use status text
+                    errorMsg = `Server hatası: ${response.status} ${response.statusText}`
+                }
+                throw new Error(errorMsg)
             }
 
+            const data = await response.json()
             setExcelResults(data)
         } catch (err) {
             setExcelError(err.message)
