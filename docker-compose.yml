@@ -46,6 +46,20 @@ services:
       - deepseek-ocr-api
     restart: unless-stopped
 
+  # MBR Künye Pipeline - API Service (OpenAI + DeepSeek OCR)
+  mbr-kunye-pipeline:
+    build:
+      context: ./pipelines/mbr-kunye-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - DEEPSEEK_OCR_URL=http://deepseek-ocr-api:8001/api/v1/ocr
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      - deepseek-ocr-api
+    restart: unless-stopped
+
   # Local Turkish-Gemma LLM - API Service (DISABLED)
   local-llm-api:
     build:
