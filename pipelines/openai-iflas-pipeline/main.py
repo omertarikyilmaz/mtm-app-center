@@ -225,17 +225,31 @@ def download_image(image_url: str) -> Optional[bytes]:
         Image bytes or None if download fails
     """
     try:
-        response = requests.get(image_url, timeout=15)
+        print(f"[DEBUG] Downloading image from: {image_url}")
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(image_url, headers=headers, timeout=30)
         response.raise_for_status()
         
+        content_type = response.headers.get('content-type', '')
+        print(f"[DEBUG] Download successful. Content-Type: {content_type}, Size: {len(response.content)} bytes")
+        
         # Verify it's an image
-        img = Image.open(BytesIO(response.content))
-        img.verify()
+        try:
+            img = Image.open(BytesIO(response.content))
+            img.verify()
+            print(f"[DEBUG] Image verification successful. Format: {img.format}")
+        except Exception as e:
+            print(f"[WARNING] Image verification failed: {e}. Content might not be a valid image.")
+            # We might still want to return content if it's just a verification issue but looks like image
+            if 'image' not in content_type:
+                return None
         
         return response.content
         
     except Exception as e:
-        print(f"Error downloading image from {image_url}: {e}")
+        print(f"[ERROR] Error downloading image from {image_url}: {e}")
         return None
 
 
