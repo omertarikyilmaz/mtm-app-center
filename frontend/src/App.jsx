@@ -807,27 +807,51 @@ function KunyeInterface() {
                         </div>
                     )}
 
-                    {results && (
+                    {results && !loading && (
                         <div>
-                            {/* Summary */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-                                <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>{results.total}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam</div>
+                            {/* Check if batch mode */}
+                            {results._isBatch ? (
+                                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✅</div>
+                                    <h3 style={{ color: '#10b981', marginBottom: '1rem' }}>Batch İşi Oluşturuldu!</h3>
+                                    <div style={{ background: 'var(--surface-color)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
+                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Batch ID:</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600, fontFamily: 'monospace', color: '#ec4899' }}>
+                                            {results.batch_id}
+                                        </div>
+                                    </div>
+                                    <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                                        {results.ocr_count} görsel OCR'dan geçti.<br />
+                                        OpenAI Batch API'sine gönderildi.<br />
+                                        ⏰ 5-30 dakika içinde tamamlanacak.
+                                    </p>
+                                    <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '0.5rem', fontSize: '0.85rem' }}>
+                                        💡 <strong>Not:</strong> Batch ID'yi kaydedin. Sonuçları daha sonra batch status endpoint'inden alabilirsiniz.
+                                    </div>
                                 </div>
-                                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{results.successful}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Başarılı</div>
-                                </div>
-                                <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{results.failed}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hata</div>
-                                </div>
-                                <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ec4899' }}>{results.processed}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>İşlenen</div>
-                                </div>
-                            </div>
+                            ) : (
+                                <>
+                                    {/* Summary */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                                        <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>{results.total}</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam</div>
+                                        </div>
+                                        <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{results.successful}</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Başarılı</div>
+                                        </div>
+                                        <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{results.failed}</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hata</div>
+                                        </div>
+                                        <div style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ec4899' }}>{results.processed}</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>İşlenen</div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
                             {/* Results Preview */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
