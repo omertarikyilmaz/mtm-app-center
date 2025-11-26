@@ -32,7 +32,7 @@ services:
       - deepseek-ocr-vllm
     restart: unless-stopped
 
-  # İflas OCR Pipeline - API Service (OpenAI + OCR)
+  # İflas OCR Pipeline - API Service (OpenAI + DeepSeek OCR)
   iflas-pipeline-api:
     build:
       context: ./pipelines/openai-iflas-pipeline
@@ -41,11 +41,9 @@ services:
       - "8003:8003"
     environment:
       - DEEPSEEK_OCR_URL=http://deepseek-ocr-api:8001/api/v1/ocr
-      - HUNYUAN_OCR_URL=http://hunyuan-ocr-api:8002/api/v1/ocr
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
       - deepseek-ocr-api
-      - hunyuan-ocr-api
     restart: unless-stopped
 
   # Local Turkish-Gemma LLM - API Service (DISABLED)
@@ -68,38 +66,6 @@ services:
     profiles:
       - disabled  # This service is disabled by default
 
-  # Hunyuan OCR - Model Server (vLLM)
-  hunyuan-ocr-vllm:
-    build:
-      context: ./hunyuan-ocr-service
-      dockerfile: Dockerfile.vllm
-    ports:
-      - "8102:8102"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    volumes:
-      - ./.cache/huggingface:/root/.cache/huggingface
-    command: vllm serve tencent/HunyuanOCR --host 0.0.0.0 --port 8102 --no-enable-prefix-caching --mm-processor-cache-gb 0 --gpu-memory-utilization 0.45
-    restart: unless-stopped
-
-  # Hunyuan OCR - API Service (FastAPI)
-  hunyuan-ocr-api:
-    build:
-      context: ./hunyuan-ocr-service
-      dockerfile: Dockerfile
-    ports:
-      - "8002:8002"
-    environment:
-      - VLLM_URL=http://hunyuan-ocr-vllm:8102/v1
-    depends_on:
-      - hunyuan-ocr-vllm
-    restart: unless-stopped
-
   # Frontend - Web UI (React + Nginx)
   frontend:
     build:
@@ -109,6 +75,5 @@ services:
       - "80:80"
     depends_on:
       - deepseek-ocr-api
-      - hunyuan-ocr-api
       - iflas-pipeline-api
     restart: unless-stopped

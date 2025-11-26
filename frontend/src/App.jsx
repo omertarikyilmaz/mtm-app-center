@@ -39,8 +39,6 @@ function App() {
                     <Dashboard onViewChange={setCurrentView} />
                 ) : currentView === 'ocr' ? (
                     <OCRInterface />
-                ) : currentView === 'hunyuan' ? (
-                    <HunyuanOCRInterface />
                 ) : currentView === 'pipelines' ? (
                     <IflasOCRInterface />
                 ) : currentView === 'documentation' ? (
@@ -60,13 +58,6 @@ function Dashboard({ onViewChange }) {
             name: 'DeepSeek OCR',
             description: 'DeepSeek-V2 ve vLLM destekli gelişmiş optik karakter tanıma servisi.',
             icon: <ScanText size={32} color="#6366f1" />,
-            status: 'Aktif'
-        },
-        {
-            id: 'hunyuan',
-            name: 'Hunyuan OCR',
-            description: 'Tencent Hunyuan OCR modeli - Yüksek performanslı metin tanıma servisi.',
-            icon: <ScanText size={32} color="#10b981" />,
             status: 'Aktif'
         },
         {
@@ -343,211 +334,6 @@ function OCRInterface() {
     )
 }
 
-function HunyuanOCRInterface() {
-    const [files, setFiles] = useState([])
-    const [previews, setPreviews] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [results, setResults] = useState(null)
-    const [error, setError] = useState(null)
-    const [format, setFormat] = useState('json')
-    const fileInputRef = useRef(null)
-
-    const handleFileChange = (e) => {
-        const selectedFiles = Array.from(e.target.files)
-        if (selectedFiles.length > 0) {
-            setFiles(selectedFiles)
-            const newPreviews = selectedFiles.map(file => URL.createObjectURL(file))
-            setPreviews(newPreviews)
-            setResults(null)
-            setError(null)
-        }
-    }
-
-    const handleUpload = async () => {
-        if (files.length === 0) return
-
-        setLoading(true)
-        setError(null)
-
-        const formData = new FormData()
-        files.forEach(file => {
-            formData.append('files', file)
-        })
-        formData.append('response_format', format)
-
-        try {
-            const response = await fetch('/api/v1/hunyuan-ocr', {
-                method: 'POST',
-                body: formData,
-            })
-
-            if (!response.ok) {
-                throw new Error('OCR işlemi başarısız oldu')
-            }
-
-            const data = await response.json()
-            setResults(data)
-        } catch (err) {
-            setError(err.message)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    return (
-        <div className="animate-fade-in" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                    <ScanText size={32} color="#10b981" />
-                </div>
-                <div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Hunyuan OCR</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>Tencent Hunyuan modelini kullanarak görselden metin çıkarın.</p>
-                </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                {/* Upload Section */}
-                <div className="glass-panel" style={{ padding: '2rem' }}>
-                    <div
-                        style={{
-                            border: '2px dashed var(--border-color)',
-                            borderRadius: '1rem',
-                            padding: '3rem 2rem',
-                            textAlign: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            background: files.length > 0 ? 'rgba(16, 185, 129, 0.05)' : 'transparent'
-                        }}
-                        onClick={() => fileInputRef.current.click()}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                            e.preventDefault()
-                            const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-                            if (droppedFiles.length > 0) {
-                                setFiles(droppedFiles)
-                                setPreviews(droppedFiles.map(f => URL.createObjectURL(f)))
-                                setResults(null)
-                                setError(null)
-                            }
-                        }}
-                    >
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            accept="image/*"
-                            multiple
-                            style={{ display: 'none' }}
-                        />
-
-                        {files.length > 0 ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
-                                {previews.map((preview, idx) => (
-                                    <div key={idx} style={{ position: 'relative' }}>
-                                        <img src={preview} alt={`Preview ${idx}`} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '0.5rem', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
-                                    </div>
-                                ))}
-                                <div style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
-                                    <p style={{ fontSize: '0.9rem', fontWeight: 500 }}>{files.length} dosya seçildi</p>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Değiştirmek için tıklayın</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div style={{ background: 'var(--surface-color)', width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                                    <Upload size={32} color="var(--text-secondary)" />
-                                </div>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Resim yüklemek için tıklayın</h3>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Birden fazla dosya seçebilirsiniz (JPG, PNG, WEBP)</p>
-                            </>
-                        )}
-                    </div>
-
-                    <div style={{ marginTop: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>Çıktı Formatı</label>
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button
-                                className={`btn ${format === 'json' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setFormat('json')}
-                                style={{ flex: 1 }}
-                            >
-                                JSON
-                            </button>
-                            <button
-                                className={`btn ${format === 'text' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setFormat('text')}
-                                style={{ flex: 1 }}
-                            >
-                                Text
-                            </button>
-                        </div>
-                    </div>
-
-                    <button
-                        className="btn btn-primary"
-                        style={{ width: '100%', marginTop: '1.5rem' }}
-                        disabled={files.length === 0 || loading}
-                        onClick={handleUpload}
-                    >
-                        {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Metni Çıkar'}
-                    </button>
-                </div>
-
-                {/* Results Section */}
-                <div className="glass-panel" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', maxHeight: '800px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <FileText size={20} color="#10b981" /> Sonuçlar
-                        </h3>
-                        {results && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', color: '#10b981' }}>
-                                <CheckCircle size={14} /> Tamamlandı
-                            </span>
-                        )}
-                    </div>
-
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {loading ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)', gap: '1rem', minHeight: '200px' }}>
-                                <Loader2 className="loading-spinner" size={32} />
-                                <p>Dokümanlar analiz ediliyor...</p>
-                            </div>
-                        ) : error ? (
-                            <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <AlertCircle size={20} />
-                                {error}
-                            </div>
-                        ) : results ? (
-                            results.map((res, idx) => (
-                                <div key={idx} style={{ background: 'var(--bg-color)', borderRadius: '0.75rem', padding: '1rem', border: '1px solid var(--border-color)' }}>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
-                                        {res.filename}
-                                    </div>
-                                    <pre style={{
-                                        fontFamily: 'monospace',
-                                        whiteSpace: 'pre-wrap',
-                                        fontSize: '0.85rem',
-                                        lineHeight: 1.6,
-                                        margin: 0,
-                                        color: 'var(--text-primary)'
-                                    }}>
-                                        {res.text}
-                                    </pre>
-                                </div>
-                            ))
-                        ) : (
-                            <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
-                                Çıkarılan metinler burada görünecek...
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
 
 function ChatInterface() {
     const [messages, setMessages] = useState([
@@ -671,7 +457,6 @@ function IflasOCRInterface() {
     const [results, setResults] = useState(null)
     const [error, setError] = useState(null)
     const [apiKey, setApiKey] = useState('')
-    const [ocrService, setOcrService] = useState('deepseek')
     const fileInputRef = useRef(null)
 
     const handleFileChange = (e) => {
@@ -699,7 +484,6 @@ function IflasOCRInterface() {
             formData.append('files', file)
         })
         formData.append('openai_api_key', apiKey)
-        formData.append('ocr_service', ocrService)
 
         try {
             const response = await fetch('/api/v1/pipelines/iflas-ocr', {
@@ -745,26 +529,6 @@ function IflasOCRInterface() {
                 {/* Left Column: Interaction */}
                 <div>
                     <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
-                            OCR Servisi Seçin
-                        </label>
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                            <button
-                                className={`btn ${ocrService === 'deepseek' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setOcrService('deepseek')}
-                                style={{ flex: 1 }}
-                            >
-                                DeepSeek OCR
-                            </button>
-                            <button
-                                className={`btn ${ocrService === 'hunyuan' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setOcrService('hunyuan')}
-                                style={{ flex: 1 }}
-                            >
-                                Hunyuan OCR
-                            </button>
-                        </div>
-
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
                             OpenAI API Key *
                         </label>
