@@ -339,7 +339,7 @@ async def process_iflas_batch_from_excel(
                 
                 if not image_url:
                     row_result.status = "failed"
-                    row_result.error = "Sayfa görüntüye ul aşılamadı"
+                    row_result.error = "Sayfadaki görsele ulaşılamadı"
                     failed += 1
                     results.append(row_result)
                     continue
