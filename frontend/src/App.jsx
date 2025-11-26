@@ -174,7 +174,217 @@ function Dashboard({ onViewChange }) {
     )
 }
 
-// ... OCRInterface ...
+function OCRInterface() {
+    const [selectedFile, setSelectedFile] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [result, setResult] = useState(null)
+    const [error, setError] = useState(null)
+    const [showHelp, setShowHelp] = useState(false)
+    const fileInputRef = useRef(null)
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0]
+        if (file && file.type.startsWith('image/')) {
+            setSelectedFile(file)
+            setResult(null)
+            setError(null)
+        } else {
+            setError('Lütfen geçerli bir görsel dosyası seçin (JPG, PNG, vb.)')
+        }
+    }
+
+    const handleProcess = async () => {
+        if (!selectedFile) return
+
+        setLoading(true)
+        setError(null)
+        setResult(null)
+
+        const formData = new FormData()
+        formData.append('files', selectedFile)
+
+        try {
+            const response = await fetch('/api/v1/ocr', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+            }
+
+            const data = await response.json()
+            setResult(data)
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+            {/* Help button */}
+            <button
+                onClick={() => setShowHelp(!showHelp)}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    color: '#6366f1',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 500
+                }}
+            >
+                <HelpCircle size={18} /> Nasıl Kullanırım?
+            </button>
+
+            {/* Help Modal */}
+            {showHelp && (
+                <>
+                    <div onClick={() => setShowHelp(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1999 }} />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'var(--bg-color)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '1rem',
+                        padding: '2rem',
+                        width: '90%',
+                        maxWidth: '700px',
+                        maxHeight: '85vh',
+                        overflow: 'auto',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                        zIndex: 2000
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>📖 DeepSeek OCR Kullanım Kılavuzu</h2>
+                            <button onClick={() => setShowHelp(false)} style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer', color: '#6366f1' }}>×</button>
+                        </div>
+                        <div style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>
+                            <h3 style={{ color: '#6366f1', marginBottom: '0.5rem' }}>🎯 Ne İşe Yarar?</h3>
+                            <p>DeepSeek-V2 modeli ile görsellerdeki <strong>metinleri yüksek doğrulukla</strong> çıkarır. Türkçe dahil çok dilli destek sunar.</p>
+
+                            <h3 style={{ color: '#6366f1', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📋 Adım Adım Kullanım:</h3>
+                            <ol style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>Görsel dosyası</strong> seçin (JPG, PNG, WebP vb.)</li>
+                                <li><strong>"OCR İşle"</strong> butonuna tıklayın</li>
+                                <li>Sonuçları görüntüleyin</li>
+                            </ol>
+
+                            <h3 style={{ color: '#6366f1', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📥 Girdi Formatı:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>Desteklenen: JPG, PNG, WebP, GIF</li>
+                                <li>Maksimum boyut: 10MB</li>
+                                <li>En iyi sonuç: Yüksek çözünürlük, net metin</li>
+                            </ul>
+
+                            <h3 style={{ color: '#6366f1', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📤 Çıktı Formatı:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li><code>text</code>: Çıkarılan metin (string)</li>
+                                <li><code>confidence</code>: Güven skoru (0-1 arası)</li>
+                                <li>JSON formatında döner</li>
+                            </ul>
+
+                            <h3 style={{ color: '#6366f1', marginTop: '1.5rem', marginBottom: '0.5rem' }}>💡 İpuçları:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>Daha net görseller = Daha iyi sonuç</li>
+                                <li>Karmaşık fontlar doğruluğu azaltabilir</li>
+                                <li>Türkçe karakter desteği mükemmeldir</li>
+                            </ul>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <ScanText size={32} color="#6366f1" />
+                </div>
+                <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>DeepSeek OCR</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>DeepSeek-V2 destekli gelişmiş optik karakter tanıma</p>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                {/* Left */}
+                <div>
+                    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
+                        onClick={() => fileInputRef.current?.click()}>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                        />
+                        <Upload size={48} color="#6366f1" style={{ margin: '0 auto 1rem' }} />
+                        <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                            {selectedFile ? selectedFile.name : 'Görsel Yükle'}
+                        </p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Tıklayın veya sürükleyin
+                        </p>
+                    </div>
+
+                    <button
+                        className="btn btn-primary"
+                        style={{ width: '100%' }}
+                        onClick={handleProcess}
+                        disabled={!selectedFile || loading}
+                    >
+                        {loading ? <Loader2 className="loading-spinner" size={18} /> : <ScanText size={18} />}
+                        {loading ? 'İşleniyor...' : 'OCR İşle'}
+                    </button>
+                </div>
+
+                {/* Right */}
+                <div className="glass-panel" style={{ padding: '2rem', maxHeight: '600px', overflowY: 'auto' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuç</h3>
+
+                    {loading && (
+                        <div style={{ textAlign: 'center', padding: '3rem' }}>
+                            <Loader2 className="loading-spinner" size={32} />
+                            <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>OCR işleniyor...</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+                            <AlertCircle size={20} />
+                            {error}
+                        </div>
+                    )}
+
+                    {result && (
+                        <div>
+                            <div style={{ background: 'var(--surface-color)', padding: '1.5rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
+                                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Çıkarılan Metin:</h4>
+                                <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{result[0]?.text || 'Metin bulunamadı'}</p>
+                            </div>
+                            {result[0]?.confidence && (
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                    Güven Skoru: <strong>{(result[0].confidence * 100).toFixed(1)}%</strong>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
 
 function KunyeInterface() {
     const [excelFile, setExcelFile] = useState(null)
@@ -313,7 +523,7 @@ function KunyeInterface() {
 
     return (
         <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
-            {/* Documentation button - top right */}
+            {/* Help button - top right */}
             <button
                 onClick={() => setShowDocs(!showDocs)}
                 style={{
@@ -325,54 +535,76 @@ function KunyeInterface() {
                     borderRadius: '0.5rem',
                     padding: '0.5rem 1rem',
                     color: '#ec4899',
-                    fontSize: '0.85rem',
+                    fontSize: '0.9rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem'
+                    gap: '0.5rem',
+                    fontWeight: 500
                 }}
             >
-                <span>📖</span> API Dokümantasyonu
+                <HelpCircle size={18} /> Nasıl Kullanırım?
             </button>
 
-            {/* Documentation modal/dropdown */}
+            {/* Help Modal */}
             {showDocs && (
-                <div style={{
-                    position: 'absolute',
-                    top: '3rem',
-                    right: 0,
-                    background: 'var(--surface-color)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    width: '400px',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-                    zIndex: 1000,
-                    fontSize: '0.85rem',
-                    lineHeight: '1.6'
-                }}>
-                    <h3 style={{ marginTop: 0, color: '#ec4899' }}>Batch API Modu</h3>
-                    <p><strong>Normal Mod:</strong> Hızlı, anında sonuç (pahalı)</p>
-                    <p><strong>Batch API Modu:</strong> %50 daha ucuz ama 5-30 dakika beklersiniz</p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        Batch modu geceleyin büyük işler için idealdir. İşlem sonrası Batch ID alırsınız.
-                    </p>
-                    <button
-                        onClick={() => setShowDocs(false)}
-                        style={{
-                            marginTop: '1rem',
-                            background: '#ec4899',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '0.5rem',
-                            padding: '0.5rem 1rem',
-                            cursor: 'pointer',
-                            width: '100%'
-                        }}
-                    >
-                        Anladım
-                    </button>
-                </div>
+                <>
+                    <div onClick={() => setShowDocs(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1999 }} />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'var(--bg-color)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '1rem',
+                        padding: '2rem',
+                        width: '90%',
+                        maxWidth: '700px',
+                        maxHeight: '85vh',
+                        overflow: 'auto',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                        zIndex: 2000
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ec4899' }}>📖 MBR Künye Pipeline Kullanım Kılavuzu</h2>
+                            <button onClick={() => setShowDocs(false)} style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer', color: '#ec4899' }}>×</button>
+                        </div>
+                        <div style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>
+                            <h3 style={{ color: '#ec4899', marginBottom: '0.5rem' }}>🎯 Ne İşe Yarar?</h3>
+                            <p>Gazete ve dergi künye sayfalarından <strong>yayın bilgilerini ve çalışan listesini</strong> otomatik olarak çıkarır.</p>
+
+                            <h3 style={{ color: '#ec4899', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📋 Adım Adım Kullanım:</h3>
+                            <ol style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>OpenAI API Key</strong> girin (sk-proj- ile başlar)</li>
+                                <li><strong>Excel dosyanızı</strong> yükleyin (A sütununda Clip ID'ler olmalı)</li>
+                                <li><strong>Batch API seçeneğini</strong> belirleyin:
+                                    <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                                        <li>✅ <strong>Kapalı:</strong> Hızlı sonuç (pahalı, anında)</li>
+                                        <li>💰 <strong>Açık:</strong> %50 daha ucuz (5-30 dk bekleme)</li>
+                                    </ul>
+                                </li>
+                                <li><strong>"İşlemi Başlat"</strong> butonuna tıklayın</li>
+                                <li>Sonuçları <strong>Excel olarak indirin</strong></li>
+                            </ol>
+
+                            <h3 style={{ color: '#ec4899', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📊 Çıktı Bilgileri:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>Yayın Adı, Yayın Grubu</li>
+                                <li>Adres, Telefon, Faks, Email, Web Sitesi</li>
+                                <li>Kişiler (Ad Soyad, Görevi, Telefon, Email)</li>
+                                <li>Notlar, Ham OCR Metni</li>
+                            </ul>
+
+                            <h3 style={{ color: '#ec4899', marginTop: '1.5rem', marginBottom: '0.5rem' }}>💡 İpuçları:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>Büyük işler için <strong>Batch API</strong> kullanın (geceleyin çalıştırın)</li>
+                                <li>Her kişi için <strong>ayrı satır</strong> oluşturulur</li>
+                                <li>OCR kalitesi kötükse sonuçlar eksik olabilir</li>
+                            </ul>
+                        </div>
+                    </div>
+                </>
             )}
 
             <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -622,6 +854,7 @@ function KunyeInterface() {
 
 function IflasOCRInterface() {
     const [activeTab, setActiveTab] = useState('image')
+    const [showHelp, setShowHelp] = useState(false)
 
     // Image upload states
     const [files, setFiles] = useState([])
@@ -787,7 +1020,101 @@ function IflasOCRInterface() {
     }
 
     return (
-        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+            {/* Help button */}
+            <button
+                onClick={() => setShowHelp(!showHelp)}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    color: '#f59e0b',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 500
+                }}
+            >
+                <HelpCircle size={18} /> Nasıl Kullanırım?
+            </button>
+
+            {/* Help Modal */}
+            {showHelp && (
+                <>
+                    <div onClick={() => setShowHelp(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1999 }} />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'var(--bg-color)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '1rem',
+                        padding: '2rem',
+                        width: '90%',
+                        maxWidth: '700px',
+                        maxHeight: '85vh',
+                        overflow: 'auto',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                        zIndex: 2000
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }}>📖 İflas OCR Pipeline Kullanım Kılavuzu</h2>
+                            <button onClick={() => setShowHelp(false)} style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer', color: '#f59e0b' }}>×</button>
+                        </div>
+                        <div style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>
+                            <h3 style={{ color: '#f59e0b', marginBottom: '0.5rem' }}>🎯 Ne İşe Yarar?</h3>
+                            <p>Gazete ilanlarından <strong>iflas ve icra duyurularını</strong> analiz edip <strong>17 sütunlu yapılandırılmış veri</strong> çıkarır (davacılar, borçlular, TCN/VKN, adres vb.)</p>
+
+                            <h3 style={{ color: '#f59e0b', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📋 Adım Adım Kullanım:</h3>
+                            <h4 style={{ color: '#f59e0b', fontSize: '0.95rem', marginTop: '1rem' }}>İmaj Upload Modu:</h4>
+                            <ol style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>OpenAI API Key</strong> girin (sk-proj- ile başlar)</li>
+                                <li><strong>Görsel(ler)</strong> yükleyin (ilan fotoğrafları)</li>
+                                <li><strong>"İşlemi Başlat"</strong> butonuna tıklayın</li>
+                                <li>Sonuçları <strong>Excel olarak indirin</strong></li>
+                            </ol>
+
+                            <h4 style={{ color: '#f59e0b', fontSize: '0.95rem', marginTop: '1rem' }}>Excel Toplu İşleme Modu:</h4>
+                            <ol style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>Excel dosyası</strong> yükleyin (A sütununda Clip ID'ler)</li>
+                                <li><strong>OpenAI API Key</strong> girin</li>
+                                <li><strong>"Toplu İşle"</strong> butonuna tıklayın</li>
+                                <li>Excel sonuçları indirin</li>
+                            </ol>
+
+                            <h3 style={{ color: '#f59e0b', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📥 Girdi Formatı:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>İmaj:</strong> JPG, PNG (ilan görselleri)</li>
+                                <li><strong>Excel:</strong> .xlsx/.xls (A sütunu: Clip ID)</li>
+                            </ul>
+
+                            <h3 style={{ color: '#f59e0b', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📤 Çıktı (17 Sütun):</h3>
+                            <ul style={{ paddingLeft: '1.5rem', fontSize: '0.85rem' }}>
+                                <li>Ad/Soyad/Ünvan, TCKN, VKN, Adres</li>
+                                <li>İcra/İflas Müdürlüğü, Dosya Yılı, Dosya No</li>
+                                <li>İlan Türü, İlan Tarihi</li>
+                                <li>7 Davacı Sütunu (davaci_1 - davaci_7)</li>
+                                <li>Kaynak, Ham OCR Metni</li>
+                            </ul>
+
+                            <h3 style={{ color: '#f59e0b', marginTop: '1.5rem', marginBottom: '0.5rem' }}>💡 İpuçları:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>Tüm metinler <strong>Title Case</strong> (Her Kelime Baş Harf Büyük)</li>
+                                <li>Bulunamayan alanlar <code>null</code> döner</li>
+                                <li>Büyük işler için Excel toplu modu kullanın</li>
+                            </ul>
+                        </div>
+                    </div>
+                </>
+            )}
+
             <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
                     <Code size={32} color="#f59e0b" />
