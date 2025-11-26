@@ -457,39 +457,40 @@ function IflasOCRInterface() {
     const exportToExcel = () => {
         if (!excelResults || !excelResults.results) return
 
+        // Match columns with image upload results (IflasResult model)
         const headers = [
-            'Satır No', 'Clip ID', 'Durum', 'Ad/Soyad/Ünvan', 'TCKN', 'VKN',
-            'Adres', 'İcra/İflas Müdürlüğü', 'Dosya Yılı', 'İlan Türü',
-            'İlan Tarihi', 'Davacılar', 'Ham OCR Metni', 'Hata'
+            'Satır No', 'Clip ID', 'Durum',
+            'Ad/Soyad/Ünvan', 'TCKN', 'VKN', 'Adres',
+            'İcra/İflas Müdürlüğü', 'Dosya Yılı', 'İlan Türü',
+            'İlan Tarihi', 'Davacılar', 'Kaynak', 'Güven Skoru', 'Hata'
         ]
 
-        const rows = excelResults.results.map(result => [
-            result.row,
-            result.clip_id,
-            result.status === 'success' ? 'Başarılı' : 'Hata',
-            result.data?.ad_soyad_unvan || '',
-            result.data?.tckn || '',
-            result.data?.vkn || '',
-            result.data?.adres || '',
-            result.data?.icra_iflas_mudurlugu || '',
-            result.data?.dosya_yili || '',
-            result.data?.ilan_turu || '',
-            result.data?.ilan_tarihi || '',
-            result.data?.davacilar?.join(', ') || '',
-            result.raw_ocr_text || '',
-            result.error || ''
+        const rows = excelResults.results.map(r => [
+            r.row,
+            r.clip_id,
+            r.status === 'success' ? 'Başarılı' : 'Hata',
+            r.data?.ad_soyad_unvan || '',
+            r.data?.tckn || '',
+            r.data?.vkn || '',
+            r.data?.adres || '',
+            r.data?.icra_iflas_mudurlugu || '',
+            r.data?.dosya_yili || '',
+            r.data?.ilan_turu || '',
+            r.data?.ilan_tarihi || '',
+            r.data?.davacilar ? r.data.davacilar.join(', ') : '',
+            r.data?.kaynak || '',
+            r.data?.confidence || '',
+            r.error || ''
         ])
 
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        ].join('\n')
+        // Create Excel file using SheetJS (XLSX)
+        const ws_data = [headers, ...rows]
+        const ws = window.XLSX.utils.aoa_to_sheet(ws_data)
+        const wb = window.XLSX.utils.book_new()
+        window.XLSX.utils.book_append_sheet(wb, ws, 'İflas OCR Sonuçları')
 
-        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
-        const link = document.createElement('a')
-        link.href = URL.createObjectURL(blob)
-        link.download = `iflas_ocr_sonuclari_${new Date().toISOString().split('T')[0]}.csv`
-        link.click()
+        // Generate Excel file
+        window.XLSX.writeFile(wb, `iflas_ocr_sonuclari_${new Date().toISOString().split('T')[0]}.xlsx`)
     }
 
     return (

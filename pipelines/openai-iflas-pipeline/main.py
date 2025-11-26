@@ -392,17 +392,22 @@ async def process_iflas_batch_from_excel(
                 
                 extracted_data = json.loads(response.choices[0].message.content)
                 
+                # Add confidence based on OCR text length
+                extracted_data['confidence'] = "high" if len(ocr_text) > 100 else "medium"
+                
                 row_result.status = "success"
                 row_result.data = extracted_data
                 successful += 1
                 results.append(row_result)
+                
+                print(f"[{idx}/{total}] ✓ Success")
                 
                 # Rate limiting: small delay between requests
                 if idx < total:
                     time.sleep(0.5)
                 
             except Exception as e:
-                print(f"Error processing clip {clip_id}: {e}")
+                print(f"[ERROR] Error processing clip {clip_id}: {type(e).__name__}: {e}")
                 row_result.status = "failed"
                 row_result.error = str(e)
                 failed += 1
