@@ -67,37 +67,60 @@ def create_extraction_prompt(ocr_text: str) -> str:
     """
     Creates an engineered prompt for GPT-4 to extract bankruptcy notice fields.
     """
-    return f"""Sen Türk hukuku ve iflas/icra ilanları konusunda uzman bir yapay zekasın.
-Aşağıdaki OCR metni bir gazete sayfasından çıkarılmış iflas/icra ilanı içermektedir.
-Bu metinden aşağıdaki alanları hassas bir şekilde çıkar. Eğer bir alan bulunamazsa, o alan için null döndür.
+    return f"""Sen Türk hukuku ve iflas/icra ilanları konusunda uzman, analitik düşünebilen ve metin düzeltme yeteneği gelişmiş bir yapay zekasın.
+Aşağıdaki OCR metni, bir gazete sayfasından çıkarılmış iflas/icra ilanı içermektedir. Metin tarama kaynaklı hatalar veya bozuk karakterler içerebilir.
+Senin görevin, bu metni analiz etmek, mantıksal çıkarımlar yaparak eksik veya hatalı kısımları düzeltmek ve istenen formatta yapılandırılmış veri sunmaktır.
 
-**İSTENEN ALANLAR:**
+**TEMEL KURALLAR:**
+1. **YAZIM KURALI (TITLE CASE):** Çıkarılan TÜM metin verilerinde her kelimenin SADECE İLK HARFİ BÜYÜK olmalıdır. Geri kalan harfler küçük olmalıdır.
+   - Örnek: "İSTANBUL 10. İCRA DAİRESİ" -> "İstanbul 10. İcra Dairesi"
+   - Örnek: "AHMET YILMAZ" -> "Ahmet Yılmaz"
+2. **MANTIKSAL ÇIKARIM:** OCR hatalarını düzelt. Örneğin "lstanbul" -> "İstanbul", "lcra" -> "İcra".
+3. **BOŞ ALANLAR:** Eğer bir bilgi metinde kesinlikle yoksa veya çıkarılamıyorsa, o alan için `null` döndür.
 
-1. **ad_soyad_unvan**: İflas/icra konusu olan kişi veya kurumun tam adı ("AD SOYAD / UNVAN")
-2. **tckn**: TC Kimlik No (sadece 11 haneli, kişiler için) ("TCKN / YKN")
-3. **vkn**: Vergi Kimlik No (sadece 10 haneli, kurumlar için) ("VKN")
-4. **adres**: Kişi veya kurumun tam adresi ("ADRES")
-5. **icra_iflas_mudurlugu**: İlandaki icra/iflas müdürlüğünün tam adı ve şehri ("İCRA/İFLAS MÜDÜRLÜĞÜ")
-6. **ilan_turu**: İlan türü (örn: "Haciz İlanı", "İflas İlanı", "Satış İlanı") ("İLAN TÜRÜ")
-7. **dosya_yili**: Dosyanın yılı (sadece yıl, örn: "2024") ("DOSYA YILI")
-8. **ilan_tarihi**: İlanın yayınlandığı tarih (GG.AA.YYYY formatında) ("TARİH")
-9. **davaci_1**: Birinci davacı/alacaklı adı ("1. DAVACI")
-10. **davaci_2**: İkinci davacı/alacaklı adı ("2. DAVACI")
-11. **davaci_3**: Üçüncü davacı/alacaklı adı ("3. DAVACI")
-12. **davaci_4**: Dördüncü davacı/alacaklı adı ("4. DAVACI")
-13. **davaci_5**: Beşinci davacı/alacaklı adı ("5. DAVACI")
-14. **davaci_6**: Altıncı davacı/alacaklı adı ("6. DAVACI")
-15. **davaci_7**: Yedinci davacı/alacaklı adı ("7. DAVACI")
-16. **dosya_no**: İcra/İflas dosya numarası (örn: "2024/123 Esas") ("DOSYA NO")
-17. **kaynak**: İlanın yayınlandığı gazete adı ve sayfa numarası ("BİLGİ KAYNAĞI")
+**İSTENEN ALANLAR VE AÇIKLAMALAR:**
 
-**KURALLAR:**
-- TC Kimlik No mutlaka 11 haneli olmalı
-- Vergi Kimlik No mutlaka 10 haneli olmalı
-- Tarihleri GG.AA.YYYY formatında döndür
-- Davacıları sırasıyla doldur. Eğer 7'den az davacı varsa, geri kalanları null bırak.
-- Eğer bir bilgi metinde yoksa veya belirsizse, o alan için null döndür
-- Kesinlikle sadece geçerli JSON formatında yanıt ver, hiçbir açıklama ekleme
+1. **ad_soyad_unvan**: ("AD SOYAD / UNVAN")
+   - İflas veya icra konusu olan borçlu kişi veya kurumun tam adı.
+   - Genellikle "Borçlu:", "Müflis:" gibi ifadelerden sonra gelir.
+
+2. **tckn**: ("TCKN / YKN")
+   - Kişiler için 11 haneli TC Kimlik Numarası.
+   - Sadece rakamlardan oluşmalı.
+
+3. **vkn**: ("VKN")
+   - Kurumlar/Şirketler için 10 haneli Vergi Kimlik Numarası.
+   - Sadece rakamlardan oluşmalı.
+
+4. **adres**: ("ADRES")
+   - Borçlu veya müflisin açık adresi.
+   - Satırları birleştir ve tek bir temiz adres satırı oluştur.
+
+5. **icra_iflas_mudurlugu**: ("İCRA/İFLAS MÜDÜRLÜĞÜ")
+   - İlanı veren resmi dairenin adı.
+   - Örn: "İstanbul 10. İcra Dairesi", "Ankara Batı İflas Müdürlüğü".
+
+6. **ilan_turu**: ("İLAN TÜRÜ")
+   - İlanın içeriğine göre türünü belirle.
+   - Seçenekler: "İflas İlanı", "Haciz İlanı", "Satış İlanı", "Konkordato İlanı", "Tebligat", "Ödeme Emri".
+
+7. **dosya_yili**: ("DOSYA YILI")
+   - Dosya numarasındaki yıl bilgisi (Örn: "2024/123" ise "2024").
+
+8. **ilan_tarihi**: ("TARİH")
+   - İlanın yayınlandığı veya metin içinde geçen resmi tarih (GG.AA.YYYY formatında).
+
+9. **davaci_1** ... **davaci_7**: ("1. DAVACI" ... "7. DAVACI")
+   - Alacaklı veya davacı tarafın isimleri.
+   - Genellikle "Alacaklı:", "Davacı:" ifadelerinden sonra gelir.
+   - Birden fazla alacaklı varsa sırasıyla doldur.
+
+10. **dosya_no**: ("DOSYA NO")
+    - İcra veya iflas dosya numarası.
+    - Format genellikle "YIL/SIRA NO Esas" şeklindedir (Örn: "2024/123 Esas", "2023/54 İflas").
+
+11. **kaynak**: ("BİLGİ KAYNAĞI")
+    - İlanın yayınlandığı gazete adı ve sayfa numarası (Metinde varsa).
 
 **OCR METNİ:**
 {ocr_text}
