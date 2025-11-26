@@ -856,50 +856,52 @@ function KunyeInterface() {
                                 </>
                             )}
 
-                            {/* Results Preview */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {results.results.slice(0, 10).map((result, idx) => (
-                                    <div key={idx} style={{
-                                        background: result.status === 'success' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
-                                        borderRadius: '0.5rem',
-                                        padding: '1rem',
-                                        border: `1px solid ${result.status === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                            <span style={{ fontWeight: 600 }}>#{result.row} - {result.clip_id}</span>
-                                            <span style={{
-                                                padding: '0.25rem 0.5rem',
-                                                borderRadius: '0.25rem',
-                                                fontSize: '0.75rem',
-                                                background: result.status === 'success' ? '#10b981' : '#ef4444',
-                                                color: 'white'
-                                            }}>
-                                                {result.status === 'success' ? 'Başarılı' : 'Hata'}
-                                            </span>
+                            {/* Results Preview - only for normal mode */}
+                            {results.results && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {results.results.slice(0, 10).map((result, idx) => (
+                                        <div key={idx} style={{
+                                            background: result.status === 'success' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                                            borderRadius: '0.5rem',
+                                            padding: '1rem',
+                                            border: `1px solid ${result.status === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                <span style={{ fontWeight: 600 }}>#{result.row} - {result.clip_id}</span>
+                                                <span style={{
+                                                    padding: '0.25rem 0.5rem',
+                                                    borderRadius: '0.25rem',
+                                                    fontSize: '0.75rem',
+                                                    background: result.status === 'success' ? '#10b981' : '#ef4444',
+                                                    color: 'white'
+                                                }}>
+                                                    {result.status === 'success' ? 'Başarılı' : 'Hata'}
+                                                </span>
+                                            </div>
+                                            {result.status === 'success' ? (
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{result.data?.yayin_adi}</div>
+                                                    {result.data?.kisiler && (
+                                                        <div style={{ marginTop: '0.5rem' }}>
+                                                            {result.data.kisiler.length} kişi bulundu:
+                                                            <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
+                                                                {result.data.kisiler.slice(0, 3).map((k, i) => (
+                                                                    <li key={i}>{k.ad_soyad} ({k.gorev})</li>
+                                                                ))}
+                                                                {result.data.kisiler.length > 3 && <li>...</li>}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: '0.85rem', color: '#ef4444' }}>
+                                                    {result.error}
+                                                </div>
+                                            )}
                                         </div>
-                                        {result.status === 'success' ? (
-                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{result.data?.yayin_adi}</div>
-                                                {result.data?.kisiler && (
-                                                    <div style={{ marginTop: '0.5rem' }}>
-                                                        {result.data.kisiler.length} kişi bulundu:
-                                                        <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
-                                                            {result.data.kisiler.slice(0, 3).map((k, i) => (
-                                                                <li key={i}>{k.ad_soyad} ({k.gorev})</li>
-                                                            ))}
-                                                            {result.data.kisiler.length > 3 && <li>...</li>}
-                                                        </ul>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div style={{ fontSize: '0.85rem', color: '#ef4444' }}>
-                                                {result.error}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
