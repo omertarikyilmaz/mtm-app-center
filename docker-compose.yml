@@ -84,7 +84,7 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    command: python -m vllm.entrypoints.openai.api_server --model tencent/HunyuanOCR --host 0.0.0.0 --port 8102 --trust-remote-code --gpu-memory-utilization 0.45
+    command: vllm serve tencent/HunyuanOCR --host 0.0.0.0 --port 8102 --no-enable-prefix-caching --mm-processor-cache-gb 0 --gpu-memory-utilization 0.45
     restart: unless-stopped
 
   # Hunyuan OCR - API Service (FastAPI)

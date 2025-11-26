@@ -9,26 +9,24 @@ RUN apt-get update && apt-get install -y \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install vLLM and dependencies
-RUN pip install --no-cache-dir vllm transformers pillow accelerate
+# Install vLLM NIGHTLY build (required for HunyuanOCR support)
+RUN pip install --no-cache-dir -U vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
 
-# Pre-download the model (optional, but recommended)
-# This will cache the model in the Docker image
+# Install transformers and other dependencies
+RUN pip install --no-cache-dir transformers pillow accelerate
+
+# Pre-download the model tokenizer and processor
 RUN python -c "from transformers import AutoTokenizer, AutoProcessor; \
     AutoTokenizer.from_pretrained('tencent/HunyuanOCR', trust_remote_code=True); \
     AutoProcessor.from_pretrained('tencent/HunyuanOCR', trust_remote_code=True)"
 
-# The actual model weights will be downloaded at runtime and cached in the volume
-# This is just to prepare the environment
-
 # Expose vLLM port
 EXPOSE 8102
 
-# Start vLLM server
-# Note: The command will be overridden in docker-compose.yml
-CMD ["python", "-m", "vllm.entrypoints.openai.api_server", \
-     "--model", "tencent/HunyuanOCR", \
+# Start vLLM server with HunyuanOCR specific parameters
+CMD ["vllm", "serve", "tencent/HunyuanOCR", \
      "--host", "0.0.0.0", \
      "--port", "8102", \
-     "--trust-remote-code", \
+     "--no-enable-prefix-caching", \
+     "--mm-processor-cache-gb", "0", \
      "--gpu-memory-utilization", "0.45"]
