@@ -654,7 +654,7 @@ async def process_mbr_kunye_batch_hybrid(
             }
             
             # Send completion
-            yield f"data: {json.dumps({'type': 'batch_submitted', 'batch_id': batch_job.id, 'status': batch_job.status, 'successful_ocr': len(successful_ocr), 'message': f'Batch gönderildi! ID: {batch_job.id}'})}\n\n"
+            yield f"data: {json.dumps({'type': 'batch_submitted', 'batch_id': batch_job.id, 'status': batch_job.status, 'ocr_successful': len(successful_ocr), 'message': f'Batch gönderildi! ID: {batch_job.id}'})}\n\n"
                 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': f'Hata: {str(e)}'})}\n\n"

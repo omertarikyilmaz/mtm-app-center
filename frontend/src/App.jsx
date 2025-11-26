@@ -455,9 +455,11 @@ function KunyeInterface() {
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6))
+                                console.log('[Batch SSE]', data.type, data)
 
                                 if (data.type === 'batch_submitted') {
                                     // Got batch ID - show it
+                                    console.log('[Batch] Submitted! ID:', data.batch_id)
                                     setResults({
                                         _isBatch: true,
                                         batch_id: data.batch_id,
@@ -468,10 +470,11 @@ function KunyeInterface() {
                                     setLoading(false)
                                     return
                                 } else if (data.type === 'error') {
+                                    console.error('[Batch] Error:', data.message)
                                     throw new Error(data.message)
                                 }
                             } catch (e) {
-                                console.error('SSE parse error:', e)
+                                console.error('SSE parse error:', e, 'Line:', line)
                             }
                         }
                     }
