@@ -462,7 +462,7 @@ function IflasOCRInterface() {
             'Satır No', 'Clip ID', 'Durum',
             'Ad/Soyad/Ünvan', 'TCKN', 'VKN', 'Adres',
             'İcra/İflas Müdürlüğü', 'Dosya Yılı', 'İlan Türü',
-            'İlan Tarihi', 'Davacılar', 'Kaynak', 'Ham OCR Metni', 'Güven Skoru', 'Hata'
+            'İlan Tarihi', 'Davacılar', 'Kaynak', 'Ham OCR Metni'
         ]
 
         const rows = excelResults.results.map(r => [
@@ -479,9 +479,7 @@ function IflasOCRInterface() {
             r.data?.ilan_tarihi || '',
             r.data?.davacilar ? r.data.davacilar.join(', ') : '',
             r.data?.kaynak || '',
-            r.raw_ocr_text || '',
-            r.data?.confidence || '',
-            r.error || ''
+            r.raw_ocr_text || ''
         ])
 
         // Create Excel file using SheetJS (XLSX)
