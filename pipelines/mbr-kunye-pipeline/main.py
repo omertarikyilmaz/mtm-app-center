@@ -206,7 +206,7 @@ async def process_mbr_kunye_batch_stream(
             total = len(df)
             
             # Send initial status
-            yield f"data: {json.dumps({'type': 'init', 'total': total})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'init', 'total': total}, ensure_ascii=False)}\n\n"
             
             for idx, row in df.iterrows():
                 # Get Clip ID
@@ -225,22 +225,22 @@ async def process_mbr_kunye_batch_stream(
                 
                 try:
                     # Step 1: Image URL
-                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'url', 'message': 'Görsel URL oluşturuluyor...'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'url', 'message': 'Görsel URL oluşturuluyor...'}, ensure_ascii=False)}\n\n"
                     image_url = f"https://imgsrv.medyatakip.com/store/clip?gno={clip_id}"
                     
                     # Step 2: Download
-                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'download', 'message': 'Görsel indiriliyor...'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'download', 'message': 'Görsel indiriliyor...'}, ensure_ascii=False)}\n\n"
                     image_bytes = download_image(image_url)
                     if not image_bytes:
                         row_result.status = "failed"
                         row_result.error = "Görsel indirilemedi"
                         failed += 1
                         results.append(row_result)
-                        yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Görsel indirilemedi'})}\n\n"
+                        yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Görsel indirilemedi'}, ensure_ascii=False)}\n\n"
                         continue
                     
                     # Step 3: OCR
-                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ocr', 'message': 'OCR işlemi yapılıyor...'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ocr', 'message': 'OCR işlemi yapılıyor...'}, ensure_ascii=False)}\n\n"
                     ocr_files = {"files": (f"{clip_id}.jpg", image_bytes, "image/jpeg")}
                     
                     try:
@@ -252,7 +252,7 @@ async def process_mbr_kunye_batch_stream(
                         row_result.error = f"OCR Hatası: {str(e)}"
                         failed += 1
                         results.append(row_result)
-                        yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': f'OCR Hatası: {str(e)}'})}\n\n"
+                        yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': f'OCR Hatası: {str(e)}'})}\n\n"
                         continue
                     
                     ocr_data = ocr_response.json()
@@ -268,13 +268,13 @@ async def process_mbr_kunye_batch_stream(
                         row_result.raw_ocr_text = ocr_text
                         failed += 1
                         results.append(row_result)
-                        yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR metni yetersiz'})}\n\n"
+                        yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR metni yetersiz'}, ensure_ascii=False)}\n\n"
                         continue
                     
                     row_result.raw_ocr_text = ocr_text
                     
                     # Step 4: OpenAI
-                    yield f"data: {json.dumps({'type': 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ai', 'message': 'Yapay zeka ile veri çıkarımı yapılıyor...'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ai', 'message': 'Yapay zeka ile veri çıkarımı yapılıyor...'}, ensure_ascii=False)}\n\n"
                     client = openai.OpenAI(api_key=openai_api_key)
                     prompt = create_kunye_prompt(ocr_text)
                     
@@ -297,7 +297,7 @@ async def process_mbr_kunye_batch_stream(
                     results.append(row_result)
                     
                     # Success notification
-                    yield f"data: {json.dumps({'type': 'success', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Başarıyla tamamlandı'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'success', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Başarıyla tamamlandı'}, ensure_ascii=False)}\n\n"
                     
                     # Small delay for rate limiting
                     await asyncio.sleep(0.3)
@@ -308,7 +308,7 @@ async def process_mbr_kunye_batch_stream(
                     row_result.error = str(e)
                     failed += 1
                     results.append(row_result)
-                    yield f"data: {json.dumps({'type': 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': str(e)})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': str(e)}, ensure_ascii=False)}\n\n"
             
             # Send final summary
             summary = {
@@ -319,10 +319,10 @@ async def process_mbr_kunye_batch_stream(
                 'failed': failed,
                 'results': [r.dict() for r in results]
             }
-            yield f"data: {json.dumps(summary)}\n\n"
+            yield f"data: {json.dumps(summary, ensure_ascii=False)}\n\n"
                 
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Excel hatası: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'message': f'Excel hatası: {str(e)}'})}\n\n"
     
     return StreamingResponse(
         event_generator(),
@@ -506,7 +506,7 @@ async def process_mbr_kunye_batch_hybrid(
             total = len(df)
             
             # Send init
-            yield f"data: {json.dumps({'type': 'init', 'phase': 'ocr', 'total': total})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'init', 'phase': 'ocr', 'total': total}, ensure_ascii=False)}\n\n"
             
             for idx, row in df.iterrows():
                 try:
@@ -518,7 +518,7 @@ async def process_mbr_kunye_batch_hybrid(
                     
                 try:
                     # Download
-                    yield f"data: {json.dumps({'type': 'progress', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'download', 'message': 'Görsel indiriliyor...'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'download', 'message': 'Görsel indiriliyor...'}, ensure_ascii=False)}\n\n"
                     image_url = f"https://imgsrv.medyatakip.com/store/clip?gno={clip_id}"
                     image_bytes = download_image(image_url)
                     
@@ -530,11 +530,11 @@ async def process_mbr_kunye_batch_hybrid(
                             "ocr_text": None,
                             "error": "Görsel indirilemedi"
                         })
-                        yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Görsel indirilemedi'})}\n\n"
+                        yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'Görsel indirilemedi'}, ensure_ascii=False)}\n\n"
                         continue
                     
                     # OCR
-                    yield f"data: {json.dumps({'type': 'progress', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ocr', 'message': 'OCR işleniyor...'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'step': 'ocr', 'message': 'OCR işleniyor...'}, ensure_ascii=False)}\n\n"
                     ocr_files = {"files": (f"{clip_id}.jpg", image_bytes, "image/jpeg")}
                     ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
                     
@@ -546,7 +546,7 @@ async def process_mbr_kunye_batch_hybrid(
                             "ocr_text": None,
                             "error": f"OCR HTTP {ocr_response.status_code}"
                         })
-                        yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': f'OCR hatası'})}\n\n"
+                        yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': f'OCR hatası'}, ensure_ascii=False)}\n\n"
                         continue
                     
                     ocr_data = ocr_response.json()
@@ -564,7 +564,7 @@ async def process_mbr_kunye_batch_hybrid(
                             "ocr_text": ocr_text,
                             "error": "OCR metni yetersiz"
                         })
-                        yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR metni yetersiz'})}\n\n"
+                        yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR metni yetersiz'}, ensure_ascii=False)}\n\n"
                         continue
                     
                     ocr_results.append({
@@ -575,7 +575,7 @@ async def process_mbr_kunye_batch_hybrid(
                         "error": None
                     })
                     
-                    yield f"data: {json.dumps({'type': 'success', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR tamamlandı'})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'success', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': 'OCR tamamlandı'}, ensure_ascii=False)}\n\n"
                     
                 except Exception as e:
                     print(f"[ERROR] OCR failed for {clip_id}: {e}")
@@ -586,15 +586,15 @@ async def process_mbr_kunye_batch_hybrid(
                         "ocr_text": None,
                         "error": str(e)
                     })
-                    yield f"data: {json.dumps({'type': 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': str(e)})}\n\n"
+                    yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'phase': 'ocr', 'row': idx+1, 'total': total, 'clip_id': clip_id, 'message': str(e)}, ensure_ascii=False)}\n\n"
             
             # Phase 2: Create Batch
-            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': 'Batch dosyası hazırlanıyor...'})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'phase': 'batch', 'message': 'Batch dosyası hazırlanıyor...'}, ensure_ascii=False)}\n\n"
             
             successful_ocr = [r for r in ocr_results if r["ocr_text"] and not r["error"]]
             
             if not successful_ocr:
-                yield f"data: {json.dumps({'type': 'error', 'phase': 'batch', 'message': 'Hiçbir OCR başarılı olmadı'})}\n\n"
+                yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'phase': 'batch', 'message': 'Hiçbir OCR başarılı olmadı'}, ensure_ascii=False)}\n\n"
                 return
             
             # Create JSONL for batch
@@ -626,7 +626,7 @@ async def process_mbr_kunye_batch_hybrid(
             
             # Upload to OpenAI
             msg1 = "OpenAI'a yükleniyor..."
-            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': msg1})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'phase': 'batch', 'message': msg1}, ensure_ascii=False)}\n\n"
             client = openai.OpenAI(api_key=openai_api_key)
             
             with open(batch_file_path, 'rb') as f:
@@ -634,7 +634,7 @@ async def process_mbr_kunye_batch_hybrid(
             
             # Create batch job
             msg2 = "Batch job oluşturuluyor..."
-            yield f"data: {json.dumps({'type': 'progress', 'phase': 'batch', 'message': msg2})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'progress', 'phase': 'batch', 'message': msg2}, ensure_ascii=False)}\n\n"
             batch_job = client.batches.create(
                 input_file_id=batch_input_file.id,
                 endpoint="/v1/chat/completions",
@@ -654,10 +654,10 @@ async def process_mbr_kunye_batch_hybrid(
             }
             
             # Send completion
-            yield f"data: {json.dumps({'type': 'batch_submitted', 'batch_id': batch_job.id, 'status': batch_job.status, 'ocr_successful': len(successful_ocr), 'message': f'Batch gönderildi! ID: {batch_job.id}'})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'batch_submitted', 'batch_id': batch_job.id, 'status': batch_job.status, 'ocr_successful': len(successful_ocr), 'message': f'Batch gönderildi! ID: {batch_job.id}'})}\n\n"
                 
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Hata: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'type', ensure_ascii=False: 'error', 'message': f'Hata: {str(e)}'})}\n\n"
     
     return StreamingResponse(
         event_generator(),
