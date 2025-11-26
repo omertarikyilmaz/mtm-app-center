@@ -1,52 +1,41 @@
-import { useState, useRef, useEffect } from 'react'
-import { ScanText, LayoutGrid, ArrowLeft, Upload, FileText, Loader2, CheckCircle, AlertCircle, MessageSquare, Send, Bot, Code, Book, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import Documentation from './Documentation'
+import './index.css'
 
 function App() {
     const [currentView, setCurrentView] = useState('dashboard')
 
     return (
-        <div className="app-wrapper">
-            <header style={{ borderBottom: '1px solid var(--border-color)', padding: '1rem 0', background: 'var(--glass-bg)', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(10px)' }}>
-                <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }} onClick={() => setCurrentView('dashboard')}>
-                        <img src="/logo.png" alt="MTM Logo" style={{ height: '40px', width: 'auto' }} />
-                        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.025em' }}>Medya Takip Merkezi (MTM)</h1>
-                    </div>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <button
-                            className="btn"
-                            onClick={() => setCurrentView('documentation')}
-                            style={{
-                                background: currentView === 'documentation' ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                                color: currentView === 'documentation' ? '#6366f1' : 'var(--text-secondary)',
-                                border: '1px solid ' + (currentView === 'documentation' ? 'rgba(99, 102, 241, 0.2)' : 'transparent')
-                            }}
-                        >
-                            <Book size={18} /> Dokümantasyon
-                        </button>
-                        {currentView !== 'dashboard' && (
-                            <button className="btn btn-secondary" onClick={() => setCurrentView('dashboard')} style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>
-                                <ArrowLeft size={16} /> Uygulamalara Dön
-                            </button>
-                        )}
-                    </div>
-                </div>
+        <div style={{ minHeight: '100vh', padding: '2rem' }}>
+            <header style={{ marginBottom: '3rem', maxWidth: '1400px', margin: '0 auto 3rem' }}>
+                <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '0.5rem', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    MTM App Center
+                </h1>
+                <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>DeepSeek OCR, Local LLM ve Pipeline Servisleri</p>
             </header>
 
-            <main className="container" style={{ flex: 1, padding: '2rem' }}>
-                {currentView === 'dashboard' ? (
-                    <Dashboard onViewChange={setCurrentView} />
-                ) : currentView === 'ocr' ? (
-                    <OCRInterface />
-                ) : currentView === 'pipelines' ? (
-                    <IflasOCRInterface />
-                ) : currentView === 'documentation' ? (
-                    <Documentation />
-                ) : (
-                    <ChatInterface />
-                )}
-            </main>
+            {currentView === 'dashboard' ? (
+                <Dashboard onViewChange={setCurrentView} />
+            ) : currentView === 'ocr' ? (
+                <OCRInterface />
+            ) : currentView === 'pipelines' ? (
+                <IflasOCRInterface />
+            ) : currentView === 'chat' ? (
+                <ChatInterface />
+            ) : currentView === 'documentation' ? (
+                <Documentation />
+            ) : null}
+
+            {currentView !== 'dashboard' && (
+                <button
+                    className="btn btn-secondary"
+                    style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    onClick={() => setCurrentView('dashboard')}
+                >
+                    ← Ana Sayfaya Dön
+                </button>
+            )}
         </div>
     )
 }
@@ -78,52 +67,57 @@ function Dashboard({ onViewChange }) {
     ]
 
     return (
-        <div className="animate-fade-in">
-            <div style={{ marginBottom: '3rem', textAlign: 'center' }}>
-                <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '1rem', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                    Yapay Zeka Servisleri
-                </h2>
-
-            </div>
-
-            <div className="grid-layout">
-                {apps.map(app => (
-                    <div key={app.id}
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '3rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                {apps.map((app) => (
+                    <div
+                        key={app.id}
                         className="glass-panel"
                         style={{
                             padding: '2rem',
-                            transition: 'transform 0.2s',
                             cursor: app.disabled ? 'not-allowed' : 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '1rem',
-                            opacity: app.disabled ? 0.6 : 1
+                            opacity: app.disabled ? 0.6 : 1,
+                            transition: 'all 0.2s'
                         }}
                         onClick={() => !app.disabled && onViewChange(app.id)}
-                        onMouseEnter={(e) => !app.disabled && (e.currentTarget.style.transform = 'translateY(-5px)')}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div style={{ background: app.disabled ? 'rgba(148, 163, 184, 0.1)' : (app.id === 'ocr' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(16, 185, 129, 0.1)'), padding: '1rem', borderRadius: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                            <div style={{ background: 'var(--surface-color)', padding: '0.75rem', borderRadius: '0.75rem' }}>
                                 {app.icon}
                             </div>
-                            <span style={{
-                                background: app.disabled ? 'rgba(148, 163, 184, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                                color: app.disabled ? '#94a3b8' : '#10b981',
-                                padding: '0.25rem 0.75rem',
-                                borderRadius: '999px',
-                                fontSize: '0.75rem',
-                                fontWeight: 600
-                            }}>
-                                {app.status}
-                            </span>
+                            <div style={{ flex: 1 }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.25rem' }}>{app.name}</h3>
+                                <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '1rem',
+                                    background: app.status === 'Aktif' ? 'rgba(16, 185, 129, 0.1)' : app.status === 'Beta' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                    color: app.status === 'Aktif' ? '#10b981' : app.status === 'Beta' ? '#f59e0b' : '#ef4444',
+                                    fontWeight: 600
+                                }}>
+                                    {app.status}
+                                </span>
+                            </div>
                         </div>
-                        <div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>{app.name}</h3>
-                            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>{app.description}</p>
-                        </div>
+                        <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>{app.description}</p>
                     </div>
                 ))}
+
+                <div
+                    className="glass-panel"
+                    style={{ padding: '2rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onClick={() => onViewChange('documentation')}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ background: 'var(--surface-color)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                            <FileText size={32} color="#8b5cf6" />
+                        </div>
+                        <div>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>API Dokümantasyonu</h3>
+                        </div>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>Tüm servislerin API kullanımı, endpoint'ler ve örnekler</p>
+                </div>
             </div>
         </div>
     )
@@ -335,122 +329,10 @@ function OCRInterface() {
 }
 
 
-function ChatInterface() {
-    const [messages, setMessages] = useState([
-        { role: 'assistant', content: 'Merhaba! Ben MTM yapay zeka asistanıyım. Size nasıl yardımcı olabilirim?' }
-    ])
-    const [input, setInput] = useState('')
-    const [loading, setLoading] = useState(false)
-    const messagesEndRef = useRef(null)
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
-
-    useEffect(() => {
-        scrollToBottom()
-    }, [messages])
-
-    const handleSend = async (e) => {
-        e.preventDefault()
-        if (!input.trim() || loading) return
-
-        const userMessage = { role: 'user', content: input }
-        setMessages(prev => [...prev, userMessage])
-        setInput('')
-        setLoading(true)
-
-        try {
-            // Prepare messages for API (exclude initial greeting as models expect User first)
-            const apiMessages = [...messages, userMessage]
-                .filter((m, i) => !(i === 0 && m.role === 'assistant'))
-                .map(m => ({ role: m.role, content: m.content }))
-
-            const response = await fetch('/api/v1/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: apiMessages })
-            })
-
-            if (!response.ok) throw new Error('Failed to fetch response')
-
-            const data = await response.json()
-            setMessages(prev => [...prev, { role: 'assistant', content: data.response }])
-        } catch (error) {
-            setMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.' }])
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    return (
-        <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto', height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
-                    <MessageSquare size={32} color="#10b981" />
-                </div>
-                <div>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Qwen LLM Sohbet</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>Yapay zeka asistanı ile sohbet edin.</p>
-                </div>
-            </div>
-
-            <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {/* Messages Area */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {messages.map((msg, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                            <div style={{
-                                maxWidth: '80%',
-                                padding: '1rem',
-                                borderRadius: '1rem',
-                                borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
-                                borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
-                                background: msg.role === 'user' ? 'var(--primary-color)' : 'var(--surface-color)',
-                                color: 'var(--text-primary)',
-                                lineHeight: 1.5
-                            }}>
-                                {msg.content}
-                            </div>
-                        </div>
-                    ))}
-                    {loading && (
-                        <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                            <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '1rem', borderTopLeftRadius: 0 }}>
-                                <Loader2 className="loading-spinner" size={20} />
-                            </div>
-                        </div>
-                    )}
-                    <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input Area */}
-                <form onSubmit={handleSend} style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '1rem' }}>
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Mesajınızı yazın..."
-                        style={{
-                            flex: 1,
-                            background: 'var(--bg-color)',
-                            border: '1px solid var(--border-color)',
-                            padding: '0.75rem 1rem',
-                            borderRadius: '0.5rem',
-                            color: 'white',
-                            outline: 'none'
-                        }}
-                    />
-                    <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
-                        <Send size={20} />
-                    </button>
-                </form>
-            </div>
-        </div>
-    )
-}
-
 function IflasOCRInterface() {
+    const [activeTab, setActiveTab] = useState('image')
+
+    // Image upload states
     const [files, setFiles] = useState([])
     const [previews, setPreviews] = useState([])
     const [loading, setLoading] = useState(false)
@@ -458,6 +340,13 @@ function IflasOCRInterface() {
     const [error, setError] = useState(null)
     const [apiKey, setApiKey] = useState('')
     const fileInputRef = useRef(null)
+
+    // Excel batch states
+    const [excelFile, setExcelFile] = useState(null)
+    const [excelLoading, setExcelLoading] = useState(false)
+    const [excelResults, setExcelResults] = useState(null)
+    const [excelError, setExcelError] = useState(null)
+    const excelInputRef = useRef(null)
 
     const handleFileChange = (e) => {
         const selectedFiles = Array.from(e.target.files)
@@ -513,6 +402,88 @@ function IflasOCRInterface() {
         }
     }
 
+    const handleExcelChange = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            setExcelFile(file)
+            setExcelResults(null)
+            setExcelError(null)
+        }
+    }
+
+    const handleExcelProcess = async () => {
+        if (!excelFile) return
+        if (!apiKey || apiKey.trim() === '') {
+            setExcelError('Lütfen OpenAI API Key giriniz')
+            return
+        }
+
+        setExcelLoading(true)
+        setExcelError(null)
+
+        const formData = new FormData()
+        formData.append('file', excelFile)
+        formData.append('openai_api_key', apiKey)
+        formData.append('id_column', 'A')
+
+        try {
+            const response = await fetch('/api/v1/pipelines/iflas-ocr-batch', {
+                method: 'POST',
+                body: formData,
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'İşlem başarısız oldu')
+            }
+
+            setExcelResults(data)
+        } catch (err) {
+            setExcelError(err.message)
+        } finally {
+            setExcelLoading(false)
+        }
+    }
+
+    const exportToExcel = () => {
+        if (!excelResults || !excelResults.results) return
+
+        const headers = [
+            'Satır No', 'Clip ID', 'Durum', 'Ad/Soyad/Ünvan', 'TCKN', 'VKN',
+            'Adres', 'İcra/İflas Müdürlüğü', 'Dosya Yılı', 'İlan Türü',
+            'İlan Tarihi', 'Davacılar', 'Ham OCR Metni', 'Hata'
+        ]
+
+        const rows = excelResults.results.map(result => [
+            result.row,
+            result.clip_id,
+            result.status === 'success' ? 'Başarılı' : 'Hata',
+            result.data?.ad_soyad_unvan || '',
+            result.data?.tckn || '',
+            result.data?.vkn || '',
+            result.data?.adres || '',
+            result.data?.icra_iflas_mudurlugu || '',
+            result.data?.dosya_yili || '',
+            result.data?.ilan_turu || '',
+            result.data?.ilan_tarihi || '',
+            result.data?.davacilar?.join(', ') || '',
+            result.raw_ocr_text || '',
+            result.error || ''
+        ])
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n')
+
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `iflas_ocr_sonuclari_${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+    }
+
     return (
         <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
             <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -525,177 +496,322 @@ function IflasOCRInterface() {
                 </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                {/* Left Column: Interaction */}
-                <div>
-                    <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
-                            OpenAI API Key *
-                        </label>
-                        <input
-                            type="password"
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="sk-proj-..."
-                            style={{
-                                width: '100%',
-                                padding: '0.75rem',
-                                background: 'var(--bg-color)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '0.5rem',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.9rem'
-                            }}
-                        />
-                        <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            API key'iniz sadece bu istek için kullanılır ve saklanmaz. <a href="https://platform.openai.com/api-keys" target="_blank" style={{ color: '#f59e0b' }}>Buradan alabilirsiniz</a>
-                        </p>
+            {/* Tab Selector */}
+            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', borderBottom: '2px solid var(--border-color)' }}>
+                <button
+                    className={`btn ${activeTab === 'image' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('image')}
+                    style={{
+                        borderRadius: '0.5rem 0.5rem 0 0',
+                        borderBottom: activeTab === 'image' ? '2px solid #f59e0b' : 'none',
+                        marginBottom: '-2px'
+                    }}
+                >
+                    <Upload size={18} /> Görsel Yükleme
+                </button>
+                <button
+                    className={`btn ${activeTab === 'excel' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('excel')}
+                    style={{
+                        borderRadius: '0.5rem 0.5rem 0 0',
+                        borderBottom: activeTab === 'excel' ? '2px solid #f59e0b' : 'none',
+                        marginBottom: '-2px'
+                    }}
+                >
+                    <FileText size={18} /> Excel Toplu İşleme
+                </button>
+            </div>
+
+            {/* Image Upload Tab */}
+            {activeTab === 'image' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                    {/* Left Column */}
+                    <div>
+                        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
+                                OpenAI API Key *
+                            </label>
+                            <input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="sk-proj-..."
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    background: 'var(--bg-color)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '0.5rem',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem'
+                                }}
+                            />
+                            <p style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                API key'iniz sadece bu istek için kullanılır. <a href="https://platform.openai.com/api-keys" target="_blank" style={{ color: '#f59e0b' }}>Buradan alabilirsiniz</a>
+                            </p>
+                        </div>
+
+                        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept="image/*"
+                                multiple
+                                style={{ display: 'none' }}
+                            />
+
+                            {previews.length > 0 ? (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
+                                    {previews.map((preview, idx) => (
+                                        <img key={idx} src={preview} alt={`Preview ${idx}`} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '0.5rem' }} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <>
+                                    <Upload size={48} color="#f59e0b" style={{ margin: '0 auto 1rem' }} />
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Gazete ilanı görsellerini yükleyin</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Birden fazla dosya seçebilirsiniz</p>
+                                </>
+                            )}
+                        </div>
+
+                        <button
+                            className="btn btn-primary"
+                            style={{ width: '100%' }}
+                            disabled={files.length === 0 || loading || !apiKey}
+                            onClick={handleProcess}
+                        >
+                            {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Verileri Çıkart'}
+                        </button>
                     </div>
 
-                    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            accept="image/*"
-                            multiple
-                            style={{ display: 'none' }}
-                        />
+                    {/* Right Column - Results */}
+                    <div className="glass-panel" style={{ padding: '2rem', maxHeight: '800px', overflowY: 'auto' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuçlar</h3>
 
-                        {files.length > 0 ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
-                                {previews.map((preview, idx) => (
-                                    <div key={idx} style={{ position: 'relative' }}>
-                                        <img src={preview} alt={`Preview ${idx}`} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '0.5rem' }} />
+                        {loading && (
+                            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <Loader2 className="loading-spinner" size={32} />
+                                <p style={{ marginTop: '1rem' }}>Veriler analiz ediliyor...</p>
+                            </div>
+                        )}
+
+                        {error && (
+                            <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+                                <AlertCircle size={20} />
+                                {error}
+                            </div>
+                        )}
+
+                        {results && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                {results.map((result, idx) => (
+                                    <div key={idx} style={{ background: 'var(--surface-color)', borderRadius: '0.75rem', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
+                                            <div><strong>Ad/Soyad/Ünvan:</strong> {result.ad_soyad_unvan || 'N/A'}</div>
+                                            <div><strong>TCKN:</strong> {result.tckn || 'N/A'}</div>
+                                            <div><strong>VKN:</strong> {result.vkn || 'N/A'}</div>
+                                            <div><strong>İlan Türü:</strong> {result.ilan_turu || 'N/A'}</div>
+                                            <div style={{ gridColumn: '1 / -1' }}><strong>Adres:</strong> {result.adres || 'N/A'}</div>
+                                            <div style={{ gridColumn: '1 / -1' }}><strong>İcra/İflas Müdürlüğü:</strong> {result.icra_iflas_mudurlugu || 'N/A'}</div>
+                                        </div>
                                     </div>
                                 ))}
-                                <div style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
-                                    <p style={{ fontSize: '0.9rem', fontWeight: 500 }}>{files.length} dosya seçildi</p>
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Değiştirmek için tıklayın</p>
-                                </div>
                             </div>
-                        ) : (
-                            <>
-                                <Upload size={48} color="var(--text-secondary)" />
-                                <h3 style={{ marginTop: '1rem' }}>Gazete ilanı yükleyin</h3>
-                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Birden fazla dosya seçebilirsiniz (JPG, PNG, WEBP)</p>
-                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Excel Batch Tab */}
+            {activeTab === 'excel' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                    {/* Left Column */}
+                    <div>
+                        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#f59e0b' }}>
+                                OpenAI API Key *
+                            </label>
+                            <input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="sk-proj-..."
+                                style={{
+                                    width: '100%',
+                                    padding: '0.75rem',
+                                    background: 'var(--bg-color)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '0.5rem',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem'
+                                }}
+                            />
+                        </div>
+
+                        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
+                            onClick={() => excelInputRef.current?.click()}
+                        >
+                            <input
+                                type="file"
+                                ref={excelInputRef}
+                                onChange={handleExcelChange}
+                                accept=".xlsx,.xls"
+                                style={{ display: 'none' }}
+                            />
+
+                            {excelFile ? (
+                                <div>
+                                    <FileText size={48} color="#10b981" style={{ margin: '0 auto 1rem' }} />
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{excelFile.name}</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Dosya yüklendi</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <FileText size={48} color="#f59e0b" style={{ margin: '0 auto 1rem' }} />
+                                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Excel dosyası yükleyin</h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>İlk kolondan clip ID'leri okunacak</p>
+                                </>
+                            )}
+                        </div>
+
+                        <button
+                            className="btn btn-primary"
+                            style={{ width: '100%', marginBottom: '1rem' }}
+                            disabled={!excelFile || excelLoading || !apiKey}
+                            onClick={handleExcelProcess}
+                        >
+                            {excelLoading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Toplu İşle'}
+                        </button>
+
+                        {excelResults && (
+                            <button
+                                className="btn btn-secondary"
+                                style={{ width: '100%', background: '#10b981', color: 'white' }}
+                                onClick={exportToExcel}
+                            >
+                                <FileText size={18} /> Excel Olarak İndir
+                            </button>
                         )}
                     </div>
 
-                    <button
-                        className="btn btn-primary"
-                        style={{ width: '100%', marginBottom: '1.5rem' }}
-                        disabled={files.length === 0 || !apiKey || loading}
-                        onClick={handleProcess}
-                    >
-                        {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Verileri Çıkar'}
-                    </button>
+                    {/* Right Column - Results */}
+                    <div className="glass-panel" style={{ padding: '2rem', maxHeight: '800px', overflowY: 'auto' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuçlar</h3>
 
-                    {(results || error) && (
-                        <div className="glass-panel" style={{ padding: '2rem' }}>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>
-                                <FileText size={20} color="#f59e0b" /> Sonuçlar
-                            </h3>
+                        {excelLoading && (
+                            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                <Loader2 className="loading-spinner" size={32} />
+                                <p style={{ marginTop: '1rem' }}>Clip'ler işleniyor...</p>
+                            </div>
+                        )}
 
-                            {error ? (
-                                <div style={{ color: '#ef4444', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
-                                    <AlertCircle size={20} /> {error}
+                        {excelError && (
+                            <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+                                <AlertCircle size={20} />
+                                {excelError}
+                            </div>
+                        )}
+
+                        {excelResults && (
+                            <div>
+                                {/* Summary */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                                    <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>{excelResults.total}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{excelResults.successful}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Başarılı</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{excelResults.failed}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hata</div>
+                                    </div>
+                                    <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }}>{excelResults.processed}</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>İşlenen</div>
+                                    </div>
                                 </div>
-                            ) : results && (
-                                <div style={{ display: 'grid', gap: '2rem' }}>
-                                    {results.map((result, idx) => (
-                                        <div key={idx} style={{ border: '1px solid var(--border-color)', borderRadius: '0.75rem', padding: '1rem', background: 'rgba(255,255,255,0.02)' }}>
-                                            <div style={{ marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                                Sonuç #{idx + 1}
+
+                                {/* Results Preview */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {excelResults.results.slice(0, 10).map((result, idx) => (
+                                        <div key={idx} style={{
+                                            background: result.status === 'success' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                                            borderRadius: '0.5rem',
+                                            padding: '1rem',
+                                            border: `1px solid ${result.status === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                <span style={{ fontWeight: 600 }}>#{result.row} - {result.clip_id}</span>
+                                                <span style={{
+                                                    padding: '0.25rem 0.5rem',
+                                                    borderRadius: '0.25rem',
+                                                    fontSize: '0.75rem',
+                                                    background: result.status === 'success' ? '#10b981' : '#ef4444',
+                                                    color: 'white'
+                                                }}>
+                                                    {result.status === 'success' ? 'Başarılı' : 'Hata'}
+                                                </span>
                                             </div>
-                                            <div style={{ display: 'grid', gap: '1rem' }}>
-                                                {Object.entries(result).map(([key, value]) => {
-                                                    if (key === 'raw_ocr_text' || key === 'confidence') return null
-                                                    const labels = {
-                                                        'ad_soyad_unvan': 'Ad Soyad/Unvan',
-                                                        'tckn': 'TCKN',
-                                                        'vkn': 'VKN',
-                                                        'adres': 'Adres',
-                                                        'icra_iflas_mudurlugu': 'İcra Müdürlüğü',
-                                                        'dosya_yili': 'Yıl',
-                                                        'ilan_turu': 'Tür',
-                                                        'ilan_tarihi': 'Tarih',
-                                                        'davacilar': 'Davacılar',
-                                                        'kaynak': 'Kaynak'
-                                                    }
-                                                    return (
-                                                        <div key={key} style={{ padding: '1rem', background: 'var(--bg-color)', borderRadius: '0.5rem' }}>
-                                                            <div style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 600 }}>{labels[key] || key}</div>
-                                                            <div style={{ marginTop: '0.25rem' }}>
-                                                                {Array.isArray(value) ? value.join(', ') : (value || 'Bulunamadı')}
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
+                                            {result.status === 'success' ? (
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                    {result.data?.ad_soyad_unvan && <div>• {result.data.ad_soyad_unvan}</div>}
+                                                    {result.data?.ilan_turu && <div>• {result.data.ilan_turu}</div>}
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: '0.85rem', color: '#ef4444' }}>
+                                                    {result.error}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
+                                    {excelResults.results.length > 10 && (
+                                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                            ... ve {excelResults.results.length - 10} sonuç daha (Excel'i indirin)
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Right Column: API Documentation */}
-                <div>
-                    <div className="glass-panel" style={{ padding: '2rem', height: '100%' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Code size={20} color="#f59e0b" /> API Kullanımı
-                        </h3>
-
-                        <div style={{ marginBottom: '2rem' }}>
-                            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.6' }}>
-                                Bu pipeline'ı kendi uygulamalarınıza entegre etmek için aşağıdaki Python örneğini kullanabilirsiniz.
-                            </p>
-
-                            <div style={{ background: '#1e293b', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                                <div style={{ padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontFamily: 'monospace' }}>python</span>
-                                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>requests</span>
-                                </div>
-                                <pre style={{ margin: 0, padding: '1rem', overflowX: 'auto', fontSize: '0.85rem', fontFamily: 'monospace', color: '#e2e8f0' }}>
-                                    {`import requests
-
-url = "http://localhost/api/v1/pipelines/iflas-ocr"
-api_key = "sk-proj-..." # OpenAI API Key
-
-# Görsel dosyasını yükle
-files = {
-    'file': ('gazete_ilani.jpg', open('gazete_ilani.jpg', 'rb'), 'image/jpeg')
-}
-
-# API key'i form verisi olarak gönder
-data = {
-    'openai_api_key': api_key
-}
-
-response = requests.post(url, files=files, data=data)
-
-if response.status_code == 200:
-    result = response.json()
-    print("Ad/Unvan:", result['ad_soyad_unvan'])
-    print("TCKN:", result['tckn'])
-    print("İlan Türü:", result['ilan_turu'])
-else:
-    print("Hata:", response.text)`}
-                                </pre>
                             </div>
-                        </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
 
-                        <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '0.5rem', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
-                                <strong style={{ color: '#f59e0b' }}>Endpoint:</strong> POST /api/v1/pipelines/iflas-ocr<br />
-                                <strong style={{ color: '#f59e0b' }}>Response:</strong> JSON (Yapılandırılmış Veri)
-                            </p>
-                        </div>
+function ChatInterface() {
+    const [messages, setMessages] = useState([
+        {
+            role: 'assistant',
+            content: 'Merhaba! Ben Turkish-Gemma asistanıyım. Size nasıl yardımcı olabilirim?'
+        }
+    ])
+    const [input, setInput] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: 'rgba(148, 163, 184, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <MessageSquare size={32} color="#94a3b8" />
+                </div>
+                <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Local Turkish-Gemma LLM</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Türkçe'ye özel eğitilmiş akıllı asistan (Hizmet Dışı)</p>
+                </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '2rem', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ flex: 1, overflowY: 'auto', marginBottom: '2rem' }}>
+                    <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '3rem' }}>
+                        Bu servis şu anda aktif değil.
                     </div>
                 </div>
             </div>
@@ -704,5 +820,3 @@ else:
 }
 
 export default App
-
-
