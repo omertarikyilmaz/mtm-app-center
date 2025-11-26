@@ -35,8 +35,8 @@ app.add_middleware(
 )
 
 # Configuration
-# Configuration
 DEEPSEEK_OCR_URL = os.getenv("DEEPSEEK_OCR_URL", "http://backend:8001/api/v1/ocr")
+HUNYUAN_OCR_URL = os.getenv("HUNYUAN_OCR_URL", "http://hunyuan-backend:8006/api/v1/ocr")
 
 class IflasResult(BaseModel):
     ad_soyad_unvan: Optional[str] = None
@@ -108,14 +108,18 @@ async def health_check():
 async def process_iflas_notice(
     files: List[UploadFile] = File(...),
     openai_api_key: Optional[str] = Form(None),
-    response_format: str = Form("json")
+    response_format: str = Form("json"),
+    ocr_service: str = Form("deepseek")  # "deepseek" or "hunyuan"
 ):
     """
     Processes multiple bankruptcy/foreclosure notice images:
-    1. Extracts text using DeepSeek OCR
+    1. Extracts text using selected OCR service (DeepSeek or Hunyuan)
     2. Uses OpenAI GPT-4 to extract structured fields
     """
     results = []
+    
+    # Select OCR URL based on user choice
+    ocr_url = DEEPSEEK_OCR_URL if ocr_service.lower() == "deepseek" else HUNYUAN_OCR_URL
 
     # API key must be provided by user
     if not openai_api_key or not openai_api_key.strip():
@@ -132,7 +136,7 @@ async def process_iflas_notice(
             # Fix: Use 'files' as key to match DeepSeek OCR endpoint expectation
             ocr_files = {"files": (file.filename, file_content, file.content_type)}
             
-            ocr_response = requests.post(DEEPSEEK_OCR_URL, files=ocr_files, timeout=60)
+            ocr_response = requests.post(ocr_url, files=ocr_files, timeout=60)
             
             if not ocr_response.ok:
                 print(f"Error processing {file.filename}: OCR failed with status {ocr_response.status_code}")

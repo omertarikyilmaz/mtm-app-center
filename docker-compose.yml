@@ -15,8 +15,8 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    # Increased to 0.60 for better performance
-    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.60
+    # Optimized to 0.45 to share GPU with Hunyuan OCR
+    command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8000 --trust-remote-code --gpu-memory-utilization 0.45
     restart: unless-stopped
 
   # DeepSeek OCR Backend (FastAPI)
@@ -41,6 +41,7 @@ services:
       - "8004:8004"
     environment:
       - DEEPSEEK_OCR_URL=http://backend:8001/api/v1/ocr
+      - HUNYUAN_OCR_URL=http://hunyuan-backend:8006/api/v1/ocr
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
       - backend
@@ -66,6 +67,38 @@ services:
     profiles:
       - disabled  # This service is disabled by default
 
+  # Hunyuan OCR Service (vLLM)
+  hunyuan-vllm:
+    build:
+      context: ./hunyuan-ocr-service
+      dockerfile: Dockerfile.vllm
+    ports:
+      - "8005:8005"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./.cache/huggingface:/root/.cache/huggingface
+    command: python -m vllm.entrypoints.openai.api_server --model tencent/HunyuanOCR --host 0.0.0.0 --port 8005 --trust-remote-code --gpu-memory-utilization 0.45
+    restart: unless-stopped
+
+  # Hunyuan OCR Backend (FastAPI)
+  hunyuan-backend:
+    build:
+      context: ./hunyuan-ocr-service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - VLLM_URL=http://hunyuan-vllm:8005/v1
+    depends_on:
+      - hunyuan-vllm
+    restart: unless-stopped
+
   # Frontend (React + Nginx)
   frontend:
     build:
@@ -75,5 +108,6 @@ services:
       - "80:80"
     depends_on:
       - backend
+      - hunyuan-backend
       - iflas-pipeline
     restart: unless-stopped
