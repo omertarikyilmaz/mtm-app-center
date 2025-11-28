@@ -1522,6 +1522,72 @@ function KunyeWebInterface() {
     }
 
     const downloadExcel = async () => {
+        // If we already have results, convert them to Excel on client side
+        if (results && results.results) {
+            try {
+                const headers = [
+                    'Satır No', 'Yayın Adı', 'Link', 'Durum',
+                    'Yayın Grubu', 'Adres', 'Telefon', 'Faks', 'Email', 'Web Sitesi',
+                    'Kişi Adı', 'Görevi', 'Kişi Telefon', 'Kişi Email',
+                    'Notlar', 'Ham Metin', 'Hata'
+                ]
+
+                const rows = []
+
+                results.results.forEach(r => {
+                    const commonData = [
+                        r.row,
+                        r.yayin_adi,
+                        r.link,
+                        r.status === 'success' ? 'Başarılı' : 'Hata',
+                        r.data?.yayin_grubu || '',
+                        r.data?.adres || '',
+                        r.data?.telefon || '',
+                        r.data?.faks || '',
+                        r.data?.email || '',
+                        r.data?.web_sitesi || ''
+                    ]
+
+                    const extraData = [
+                        r.data?.notlar || '',
+                        r.raw_html_text || '',
+                        r.error || ''
+                    ]
+
+                    if (r.data?.kisiler && r.data.kisiler.length > 0) {
+                        // Create a row for each person (like mbr-kunye-pipeline)
+                        r.data.kisiler.forEach(kisi => {
+                            rows.push([
+                                ...commonData,
+                                kisi.ad_soyad || '',
+                                kisi.gorev || '',
+                                kisi.telefon || '',
+                                kisi.email || '',
+                                ...extraData
+                            ])
+                        })
+                    } else {
+                        // No people found, just add one row with empty person fields
+                        rows.push([
+                            ...commonData,
+                            '', '', '', '', // Empty person fields
+                            ...extraData
+                        ])
+                    }
+                })
+
+                const ws_data = [headers, ...rows]
+                const ws = window.XLSX.utils.aoa_to_sheet(ws_data)
+                const wb = window.XLSX.utils.book_new()
+                window.XLSX.utils.book_append_sheet(wb, ws, 'Künye Sonuçları')
+                window.XLSX.writeFile(wb, `kunye_web_sonuclari_${new Date().toISOString().split('T')[0]}.xlsx`)
+            } catch (err) {
+                setError('Excel oluşturma hatası: ' + err.message)
+            }
+            return
+        }
+
+        // No results yet, so process from scratch
         if (!excelFile || !apiKey) return
 
         setLoading(true)
