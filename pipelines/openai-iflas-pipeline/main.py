@@ -502,11 +502,11 @@ async def process_iflas_batch_from_excel(
                     
                     # Combine Yayın Adı and Sayfa
                     if yayin_adi and sayfa:
-                        kaynak_value = f"{yayin_adi}/{sayfa}"
+                        kaynak_value = f"{yayin_adi}/SYF{sayfa}"
                     elif yayin_adi:
                         kaynak_value = yayin_adi
                     elif sayfa:
-                        kaynak_value = f"Sayfa {sayfa}"
+                        kaynak_value = f"SYF{sayfa}"
                     
                     print(f"[DEBUG] Row {idx}: Yayın Adı='{yayin_adi}', Sayfa='{sayfa}', kaynak='{kaynak_value}'")
                 except Exception as e:
