@@ -60,6 +60,17 @@ services:
       - deepseek-ocr-api
     restart: unless-stopped
 
+  # MBR Künye Web Pipeline - API Service (OpenAI + Web Scraping)
+  mbr-kunye-web-pipeline:
+    build:
+      context: ./pipelines/mbr-kunye-web-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    restart: unless-stopped
+
   # Local Turkish-Gemma LLM - API Service (DISABLED)
   local-llm-api:
     build:

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle } from 'lucide-react'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe } from 'lucide-react'
 import './index.css'
 
 function App() {
@@ -22,6 +22,8 @@ function App() {
                 <IflasOCRInterface />
             ) : currentView === 'kunye' ? (
                 <KunyeInterface />
+            ) : currentView === 'kunye-web' ? (
+                <KunyeWebInterface />
             ) : currentView === 'chat' ? (
                 <ChatInterface />
             ) : null}
@@ -62,6 +64,13 @@ function Dashboard({ onViewChange }) {
             name: 'MBR Künye Pipeline',
             description: 'Gazete/Dergi künyelerinden yayın ve çalışan bilgilerini ayrıştırır.',
             icon: <Users size={32} color="#ec4899" />,
+            status: 'Yeni'
+        },
+        {
+            id: 'kunye-web',
+            name: 'MBR Künye Web',
+            description: 'Web linkleri üzerinden künye sayfalarını analiz eder (OCR kullanmadan).',
+            icon: <Globe size={32} color="#14b8a6" />,
             status: 'Yeni'
         },
         {
@@ -1410,6 +1419,497 @@ function ChatInterface() {
                 </div>
             </div>
         </div>
+    )
+}
+
+function KunyeWebInterface() {
+    const [mode, setMode] = useState('excel') // 'excel' or 'single'
+    const [excelFile, setExcelFile] = useState(null)
+    const [singleLink, setSingleLink] = useState('')
+    const [yayinAdi, setYayinAdi] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [results, setResults] = useState(null)
+    const [error, setError] = useState(null)
+    const [apiKey, setApiKey] = useState('')
+    const [showDocs, setShowDocs] = useState(false)
+    const fileInputRef = useRef(null)
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            setExcelFile(file)
+            setResults(null)
+            setError(null)
+        }
+    }
+
+    const handleProcessSingle = async () => {
+        if (!singleLink || !singleLink.trim()) {
+            setError('Lütfen bir link giriniz')
+            return
+        }
+        if (!apiKey || apiKey.trim() === '') {
+            setError('Lütfen OpenAI API Key giriniz')
+            return
+        }
+
+        setLoading(true)
+        setError(null)
+        setResults(null)
+
+        const formData = new FormData()
+        formData.append('link', singleLink.trim())
+        formData.append('yayin_adi', yayinAdi.trim() || '')
+        formData.append('openai_api_key', apiKey)
+
+        try {
+            const response = await fetch('/api/v1/pipelines/mbr-kunye-web-single', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Server hatası: ${response.status}`)
+            }
+
+            const data = await response.json()
+            setResults({ single: data })
+        } catch (err) {
+            console.error('Error:', err)
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleProcessExcel = async () => {
+        if (!excelFile) return
+        if (!apiKey || apiKey.trim() === '') {
+            setError('Lütfen OpenAI API Key giriniz')
+            return
+        }
+
+        setLoading(true)
+        setError(null)
+        setResults(null)
+
+        const formData = new FormData()
+        formData.append('file', excelFile)
+        formData.append('openai_api_key', apiKey)
+        formData.append('yayin_column', 'A')
+        formData.append('link_column', 'B')
+
+        try {
+            const response = await fetch('/api/v1/pipelines/mbr-kunye-web-batch', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Server hatası: ${response.status}`)
+            }
+
+            const data = await response.json()
+            setResults(data)
+        } catch (err) {
+            console.error('Error:', err)
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const downloadExcel = async () => {
+        if (!excelFile || !apiKey) return
+
+        setLoading(true)
+        setError(null)
+
+        const formData = new FormData()
+        formData.append('file', excelFile)
+        formData.append('openai_api_key', apiKey)
+        formData.append('yayin_column', 'A')
+        formData.append('link_column', 'B')
+
+        try {
+            const response = await fetch('/api/v1/pipelines/mbr-kunye-web-batch-excel', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Server hatası: ${response.status}`)
+            }
+
+            // Download the Excel file
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `kunye_web_sonuclari_${new Date().toISOString().split('T')[0]}.xlsx`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (err) {
+            console.error('Error:', err)
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+            {/* Help button */}
+            <button
+                onClick={() => setShowDocs(!showDocs)}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    background: 'rgba(20, 184, 166, 0.1)',
+                    border: '1px solid rgba(20, 184, 166, 0.3)',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    color: '#14b8a6',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 500
+                }}
+            >
+                <HelpCircle size={18} /> Nasıl Kullanırım?
+            </button>
+
+            {/* Help Modal */}
+            {showDocs && (
+                <>
+                    <div onClick={() => setShowDocs(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1999 }} />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'var(--bg-color)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '1rem',
+                        padding: '2rem',
+                        width: '90%',
+                        maxWidth: '700px',
+                        maxHeight: '85vh',
+                        overflow: 'auto',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                        zIndex: 2000
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#14b8a6' }}>📖 MBR Künye Web Pipeline Kullanım Kılavuzu</h2>
+                            <button onClick={() => setShowDocs(false)} style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer', color: '#14b8a6' }}>×</button>
+                        </div>
+                        <div style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>
+                            <h3 style={{ color: '#14b8a6', marginBottom: '0.5rem' }}>🎯 Ne İşe Yarar?</h3>
+                            <p>Web linkleri üzerinden künye sayfalarını analiz eder. <strong>OCR kullanmadan</strong> direkt web scraping ile çalışır.</p>
+
+                            <h3 style={{ color: '#14b8a6', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📋 Adım Adım Kullanım:</h3>
+                            <ol style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>OpenAI API Key</strong> girin (sk-proj- ile başlar)</li>
+                                <li><strong>Excel dosyanızı</strong> yükleyin:
+                                    <ul style={{ marginTop: '0.5rem', paddingLeft: '1.5rem' }}>
+                                        <li>A sütunu: Yayın adı</li>
+                                        <li>B sütunu: Künye sayfası linki</li>
+                                    </ul>
+                                </li>
+                                <li><strong>"Toplu İşle"</strong> veya <strong>"Excel İndir"</strong> butonuna tıklayın</li>
+                            </ol>
+
+                            <h3 style={{ color: '#14b8a6', marginTop: '1.5rem', marginBottom: '0.5rem' }}>✨ Avantajlar:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>✅ OCR gerekmez (daha hızlı)</li>
+                                <li>✅ JavaScript destekli sayfalar (Playwright)</li>
+                                <li>✅ Dinamik içerik rendering</li>
+                                <li>✅ Excel export</li>
+                            </ul>
+
+                            <h3 style={{ color: '#14b8a6', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📊 Çıktı:</h3>
+                            <p>Yayın bilgileri, çalışanlar, iletişim detayları - mbr-kunye-pipeline ile <strong>aynı format</strong></p>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: 'rgba(20, 184, 166, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <Globe size={32} color="#14b8a6" />
+                </div>
+                <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>MBR Künye Web Pipeline</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Web linkleri üzerinden künye analizi (OCR kullanmadan)</p>
+                </div>
+            </div>
+
+            {/* Mode Toggle */}
+            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', padding: '0.5rem', background: 'var(--surface-color)', borderRadius: '0.75rem' }}>
+                <button
+                    onClick={() => { setMode('excel'); setResults(null); setError(null); }}
+                    style={{
+                        flex: 1,
+                        padding: '0.75rem 1.5rem',
+                        background: mode === 'excel' ? '#14b8a6' : 'transparent',
+                        color: mode === 'excel' ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    📊 Excel Yükle (Toplu İşlem)
+                </button>
+                <button
+                    onClick={() => { setMode('single'); setResults(null); setError(null); }}
+                    style={{
+                        flex: 1,
+                        padding: '0.75rem 1.5rem',
+                        background: mode === 'single' ? '#14b8a6' : 'transparent',
+                        color: mode === 'single' ? 'white' : 'var(--text-secondary)',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    🔗 Tek Link (Hızlı Test)
+                </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                {/* Left Column */}
+                <div>
+                    <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#14b8a6' }}>
+                            OpenAI API Key *
+                        </label>
+                        <input
+                            type="password"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="sk-proj-..."
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                background: 'var(--bg-color)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '0.5rem',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                    </div>
+
+                    {mode === 'single' ? (
+                        <>
+                            {/* Single Link Mode */}
+                            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#14b8a6' }}>
+                                    Künye Sayfası Linki *
+                                </label>
+                                <input
+                                    type="url"
+                                    value={singleLink}
+                                    onChange={(e) => setSingleLink(e.target.value)}
+                                    placeholder="https://www.example.com/kunye"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        background: 'var(--bg-color)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '0.5rem',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '0.9rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>
+                                    Yayın Adı (Opsiyonel)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={yayinAdi}
+                                    onChange={(e) => setYayinAdi(e.target.value)}
+                                    placeholder="Örn: Hürriyet"
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.75rem',
+                                        background: 'var(--bg-color)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '0.5rem',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '0.9rem'
+                                    }}
+                                />
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+                                    Boş bırakılırsa otomatik tespit edilir
+                                </p>
+                            </div>
+
+                            <button
+                                className="btn btn-primary"
+                                style={{ width: '100%', background: '#14b8a6', borderColor: '#14b8a6' }}
+                                disabled={!singleLink || loading || !apiKey}
+                                onClick={handleProcessSingle}
+                            >
+                                {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : '🚀 Analiz Et'}
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            {/* Excel Batch Mode */}
+                            <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', marginBottom: '1.5rem' }}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    accept=".xlsx,.xls"
+                                    style={{ display: 'none' }}
+                                />
+
+                                {excelFile ? (
+                                    <div>
+                                        <FileText size={48} color="#10b981" style={{ margin: '0 auto 1rem' }} />
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{excelFile.name}</h3>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Dosya yüklendi</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <FileText size={48} color="#14b8a6" style={{ margin: '0 auto 1rem' }} />
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Excel dosyası yükleyin</h3>
+                                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>A: Yayın adı, B: Link</p>
+                                    </>
+                                )}
+                            </div>
+
+                            <button
+                                className="btn btn-primary"
+                                style={{ width: '100%', marginBottom: '1rem', background: '#14b8a6', borderColor: '#14b8a6' }}
+                                disabled={!excelFile || loading || !apiKey}
+                                onClick={handleProcessExcel}
+                            >
+                                {loading ? <><Loader2 className="loading-spinner" size={20} /> İşleniyor...</> : 'Toplu İşle'}
+                            </button>
+
+                            <button
+                                className="btn btn-secondary"
+                                style={{ width: '100%', background: '#10b981', color: 'white' }}
+                                disabled={!excelFile || loading || !apiKey}
+                                onClick={downloadExcel}
+                            >
+                                <FileText size={18} /> Excel İndir
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                {/* Right Column - Results */}
+                <div className="glass-panel" style={{ padding: '2rem', maxHeight: '800px', overflowY: 'auto' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuçlar</h3>
+
+                    {loading && (
+                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                            <Loader2 className="loading-spinner" size={32} />
+                            <p style={{ marginTop: '1rem' }}>Web sayfaları analiz ediliyor...</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+                            <AlertCircle size={20} />
+                            {error}
+                        </div>
+                    )}
+
+                    {results && !loading && (
+                        <div>
+                            {/* Summary */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1' }}>{results.total}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam</div>
+                                </div>
+                                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{results.successful}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Başarılı</div>
+                                </div>
+                                <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' }}>{results.failed}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hata</div>
+                                </div>
+                                <div style={{ background: 'rgba(20, 184, 166, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#14b8a6' }}>{results.processed}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>İşlenen</div>
+                                </div>
+                            </div>
+
+                            {/* Results Preview */}
+                            {results.results && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {results.results.slice(0, 10).map((result, idx) => (
+                                        <div key={idx} style={{
+                                            background: result.status === 'success' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)',
+                                            borderRadius: '0.5rem',
+                                            padding: '1rem',
+                                            border: `1px solid ${result.status === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                <span style={{ fontWeight: 600 }}>#{result.row} - {result.yayin_adi}</span>
+                                                <span style={{
+                                                    padding: '0.25rem 0.5rem',
+                                                    borderRadius: '0.25rem',
+                                                    fontSize: '0.75rem',
+                                                    background: result.status === 'success' ? '#10b981' : '#ef4444',
+                                                    color: 'white'
+                                                }}>
+                                                    {result.status === 'success' ? 'Başarılı' : 'Hata'}
+                                                </span>
+                                            </div>
+                                            {result.status === 'success' ? (
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{result.data?.yayin_adi}</div>
+                                                    <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>🔗 {result.link}</div>
+                                                    {result.data?.kisiler && (
+                                                        <div style={{ marginTop: '0.5rem' }}>
+                                                            {result.data.kisiler.length} kişi bulundu
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: '0.85rem', color: '#ef4444' }}>
+                                                    Hata: {result.error}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {results.results.length > 10 && (
+                                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                            ...ve {results.results.length - 10} kayıt daha
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div >
+        </div >
     )
 }
 

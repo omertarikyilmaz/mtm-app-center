@@ -23,7 +23,7 @@ MTM App Center, medya takibi ve analizi için geliştirilmiş, mikro-servis taba
 
 ## 🏗️ Mimari ve Servisler
 
-Proje, Docker Compose ile orkestre edilen **6 ana servisten** oluşmaktadır:
+Proje, Docker Compose ile orkestre edilen **7 ana servisten** oluşmaktadır:
 
 ### 1. deepseek-ocr-vllm (Port: 8101)
 **Rol**: DeepSeek OCR Model Sunucusu
@@ -262,7 +262,89 @@ Künye için özel tasarlanmış prompt şablonu tüm yayın ve kişi bilgilerin
 
 ---
 
-### 5. local-llm-api (Port: 8004) - 🔴 DEVRE DIŞI
+### 5. mbr-kunye-web-pipeline (Port: 8007)
+**Rol**: Web Künye Analiz Pipeline'ı
+
+Excel'den alınan web linkleri üzerinden doğrudan künye sayfalarını işler. **Görsel/OCR kullanmaz**, direkt web scraping ile çalışır.
+
+**Temel Farklar**:
+
+| Özellik | mbr-kunye-pipeline | mbr-kunye-web-pipeline |
+|---------|-------------------|------------------------|
+| Girdi | Medyatakip Clip ID | Web URL |
+| İşlem | Image → OCR → GPT | Web Fetch → Parse → GPT |
+| Bağımlılık | DeepSeek OCR servisi | Sadece web erişimi |
+| Teknoloji | vLLM + OpenAI | Playwright + OpenAI |
+
+**Teknoloji Stack**:
+- **Playwright**: JavaScript rendering destekli web scraping
+- **BeautifulSoup**: HTML parsing
+- **OpenAI GPT-4o-mini**: Yapılandırılmış veri çıkarımı
+
+**API Endpoints**:
+
+#### A) Normal Batch İşleme
+```
+POST /api/v1/pipelines/mbr-kunye-web-batch
+```
+
+**Girdi**:
+- `file`: Excel dosyası
+- `openai_api_key`: OpenAI API Key
+- `yayin_column`: "A" (Yayın adı sütunu)
+- `link_column`: "B" (Web link sütunu)
+
+**Excel Formatı**:
+| A (Yayın) | B (Link) |
+|-----------|----------|
+| Hürriyet | https://www.hurriyet.com.tr/kunye |
+| Sabah | https://www.sabah.com.tr/kunye |
+
+**Çıktı**: Aynı `KunyeResult` formatı (mbr-kunye-pipeline ile %100 uyumlu)
+
+#### B) SSE Streaming İşleme
+```
+POST /api/v1/pipelines/mbr-kunye-web-batch-stream
+```
+
+Real-time progress tracking ile aynı işlemi yapar.
+
+**Event Tipleri**:
+- `init`: Başlangıç
+- `progress`: Her adım için
+  - `step: "fetch"` - Web sayfası alınıyor
+  - `step: "ai"` - OpenAI ile analiz
+- `success`: Başarılı
+- `error`: Hata
+- `complete`: Tamamlama
+
+#### C) Excel Export
+```
+POST /api/v1/pipelines/mbr-kunye-web-batch-excel
+```
+
+İşlenmiş sonuçları **Excel dosyası olarak** döndürür (indirilebilir). Kullanıcılar için kolay paylaşım ve analiz.
+
+**Excel Çıktısı İçeriği**:
+- Satır numarası
+- Yayın adı, link, durum
+- Künye verileri (düzleştirilmiş)
+- Kişiler listesi (birleştirilmiş)
+
+**Özellikler**:
+- ✅ JavaScript destekli sayfalar (Playwright)
+- ✅ Dinamik içerik rendering
+- ✅ Rate limiting (0.5s)
+- ✅ Excel export
+- ✅ SSE real-time progress
+- ❌ OCR kullanmıyor (daha hızlı)
+- ❌ GPU gerektirmiyor
+
+**Dosyalar**: `pipelines/mbr-kunye-web-pipeline/main.py`
+
+---
+
+### 6. local-llm-api (Port: 8004) - 🔴 DEVRE DIŞI
 **Rol**: Türkçe Dil Modeli Servisi
 
 YTÜ COSMOS Turkish-Gemma-9b-T1 modeli ile Türkçe chat yapabilme.
@@ -292,7 +374,7 @@ docker compose --profile disabled up -d local-llm-api
 
 ---
 
-### 6. frontend (Port: 80)
+### 7. frontend (Port: 80)
 **Rol**: Web Kullanıcı Arayüzü
 
 React + Vite ile geliştirilmiş modern SPA (Single Page Application).
@@ -362,6 +444,7 @@ location /api/v1/pipelines/mbr-kunye-batch-stream {
 | `iflas-pipeline-api` | **8003** | İflas OCR Pipeline (OpenAI + OCR) |
 | `local-llm-api` | **8004** | Local Turkish-Gemma LLM (DISABLED) |
 | `mbr-kunye-pipeline` | **8006** | MBR Künye Pipeline API |
+| `mbr-kunye-web-pipeline` | **8007** | MBR Künye Web Pipeline API |
 
 ### vLLM Model Servisleri (8101-8110)
 | Servis | Port | Açıklama |
@@ -939,5 +1022,6 @@ Bu proje, MTM (Medya Takip Merkezi) için geliştirilmiştir.
 ---
 
 **Son Güncelleme**: 2024-11-28  
-**Versiyon**: 1.0.0  
+**Versiyon**: 1.1.0 (mbr-kunye-web-pipeline eklendi)  
 **Hazırlayan**: AI Assistant
+
