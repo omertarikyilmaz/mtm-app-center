@@ -219,6 +219,11 @@ async def process_iflas_notice(
             # Parse GPT-4 response
             extracted_data = json.loads(response.choices[0].message.content)
             
+            # Convert all text fields to UPPERCASE
+            for key, value in extracted_data.items():
+                if isinstance(value, str) and value and key != 'raw_ocr_text':
+                    extracted_data[key] = value.upper()
+            
             # Return structured result
             results.append(IflasResult(
                 **extracted_data,
@@ -362,6 +367,13 @@ async def process_iflas_batch_from_excel(
                 detail=f"Kolon {id_column} Excel dosyasında bulunamadı."
             )
         
+        # Check if "Yayın Adı" and "Sayfa" columns exist
+        yayin_adi_exists = "Yayın Adı" in df.columns
+        sayfa_exists = "Sayfa" in df.columns
+        
+        print(f"Excel columns: {df.columns.tolist()}")
+        print(f"Yayın Adı column exists: {yayin_adi_exists}, Sayfa column exists: {sayfa_exists}")
+        
         # Get clip IDs from column
         clip_ids = df.iloc[:, col_idx].dropna().astype(str).tolist()
         total = len(clip_ids)
@@ -470,6 +482,44 @@ async def process_iflas_batch_from_excel(
                 
                 # Add confidence based on OCR text length
                 extracted_data['confidence'] = "high" if len(ocr_text) > 100 else "medium"
+                
+                # Get Yayın Adı and Sayfa from Excel for this row
+                kaynak_value = None
+                try:
+                    excel_row_idx = idx - 1  # idx is 1-indexed, df is 0-indexed
+                    yayin_adi = ""
+                    sayfa = ""
+                    
+                    if yayin_adi_exists and excel_row_idx < len(df):
+                        yayin_adi_val = df.loc[excel_row_idx, "Yayın Adı"]
+                        if pd.notna(yayin_adi_val):
+                            yayin_adi = str(yayin_adi_val).strip()
+                    
+                    if sayfa_exists and excel_row_idx < len(df):
+                        sayfa_val = df.loc[excel_row_idx, "Sayfa"]
+                        if pd.notna(sayfa_val):
+                            sayfa = str(sayfa_val).strip()
+                    
+                    # Combine Yayın Adı and Sayfa
+                    if yayin_adi and sayfa:
+                        kaynak_value = f"{yayin_adi}/{sayfa}"
+                    elif yayin_adi:
+                        kaynak_value = yayin_adi
+                    elif sayfa:
+                        kaynak_value = f"Sayfa {sayfa}"
+                    
+                    print(f"[DEBUG] Row {idx}: Yayın Adı='{yayin_adi}', Sayfa='{sayfa}', kaynak='{kaynak_value}'")
+                except Exception as e:
+                    print(f"[WARNING] Could not extract Yayın Adı/Sayfa for row {idx}: {e}")
+                
+                # Override kaynak with Excel data if available
+                if kaynak_value:
+                    extracted_data['kaynak'] = kaynak_value
+                
+                # Convert all text fields to UPPERCASE
+                for key, value in extracted_data.items():
+                    if isinstance(value, str) and value and key != 'raw_ocr_text':  # Don't uppercase raw OCR text
+                        extracted_data[key] = value.upper()
                 
                 row_result.status = "success"
                 row_result.data = extracted_data
