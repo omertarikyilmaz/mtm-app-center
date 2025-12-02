@@ -20,7 +20,7 @@ COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Install Nexa SDK with CUDA support
-RUN CMAKE_ARGS="-DGGML_CUDA=ON" pip3 install nexai --no-cache-dir
+RUN CMAKE_ARGS="-DGGML_CUDA=ON" pip3 install nexaai --no-cache-dir
 
 # Pre-download OmniAudio model (Q4_K_M quantized for faster inference)
 RUN python3 -c "from nexa.gguf import NexaAudioLMInference; NexaAudioLMInference('omniaudio:q4_K_M')"
