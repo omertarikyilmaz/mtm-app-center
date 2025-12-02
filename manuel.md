@@ -23,7 +23,7 @@ MTM App Center, medya takibi ve analizi için geliştirilmiş, mikro-servis taba
 
 ## 🏗️ Mimari ve Servisler
 
-Proje, Docker Compose ile orkestre edilen **9 ana servisten** oluşmaktadır:
+Proje, Docker Compose ile orkestre edilen **7 ana servisten** oluşmaktadır:
 
 ### 1. deepseek-ocr-vllm (Port: 8101)
 **Rol**: DeepSeek OCR Model Sunucusu
@@ -85,94 +85,7 @@ vLLM sunucusu ile konuşan FastAPI servisi. Kullanıcılardan görsel alır, OCR
 
 ---
 
-### 3. hunyuan-ocr-vllm (Port: 8102)
-**Rol**: HunyuanOCR Model Sunucusu
-
-vLLM kullanarak Tencent HunyuanOCR modelini GPU üzerinde çalıştırır. DeepSeek OCR'a alternatif olarak kullanılabilir, özelleştirilebilir prompt desteği sunar.
-
-**Teknik Detaylar**:
-- **Model**: `tencent/HunyuanOCR`
-- **GPU Memory**: %20 (DeepSeek ile paylaşımlı kullanım için optimize edilmiş)
-- **Port**: 8102
-- **Özellikler**:
-  - Özelleştirilebilir promptlar (text spotting, table parsing, formula recognition vb.)
-  - Çoklu görev desteği (OCR, translation, parsing)
-  - Repeated substring cleaning (resmi dokümantasyondan)
-  - Prefix caching devre dışı
-  
-**Dockerfile**: `hunyuan-ocr-service/Dockerfile.vllm`
-
-```bash
-# vLLM komutu
-vllm serve tencent/HunyuanOCR \
-  --no-enable-prefix-caching \
-  --mm-processor-cache-gb 0 \
-  --port 8102 \
-  --trust-remote-code \
-  --gpu-memory-utilization 0.2
-```
-
----
-
-### 4. hunyuan-ocr-api (Port: 8002)
-**Rol**: HunyuanOCR API Gateway
-
-vLLM sunucusu ile konuşan FastAPI servisi. Kullanıcılardan görsel ve özel prompt alır, ayarlanabilir parametrelerle OCR yapar.
-
-**API Endpoint**:
-- `POST /api/v1/hunyuan-ocr` - Çoklu görsel OCR işleme (özelleştirilebilir)
-
-**Girdi**: 
-- `files`: Görsel dosya(lar) (multipart/form-data)
-- `prompt`: Özel prompt metni (opsiyonel, varsayılan: Chinese text spotting)
-- `temperature`: Sampling sıcaklığı (0-1, varsayılan: 0.0)
-- `max_tokens`: Maksimum token sayısı (512-16384, varsayılan: 16384)
-- `top_p`: Nucleus sampling parametresi (0-1, varsayılan: 1.0)
-- `top_k`: Top-k sampling parametresi (-1 = kapalı, varsayılan: -1)
-
-**Çıktı**:
-```json
-[
-  {
-    "text": "Çıkarılan/işlenmiş içerik...",
-    "filename": "ornek.jpg",
-    "prompt": "识别图片中的公式，用 LaTeX 格式表示。",
-    "parameters": {
-      "temperature": 0.0,
-      "max_tokens": 16384,
-      "top_p": 1.0,
-      "top_k": -1
-    }
-  }
-]
-```
-
-**Hazır Prompt Şablonları**:
-
-| Görev | Prompt (Chinese) | Kullanım |
-|-------|------------------|----------|
-| **Text Spotting** | 检测并识别图片中的文字，将文本坐标格式化输出。 | Genel metin tanıma |
-| **Table Parsing** | 把图中的表格解析为 HTML。 | Tablo çıkarımı |
-| **Formula Recognition** | 识别图片中的公式，用 LaTeX 格式表示。 | Matematiksel formül tanıma |
-| **Document Parsing** | 提取文档图片中正文的所有信息用 markdown 格式表示，其中页眉、页脚部分忽略，表格用 html 格式表达，文档中公式用 latex 格式表示，按照阅读顺序组织进行解析。 | Kompleks döküman işleme |
-| **Translation** | 先提取文字，再将文字内容翻译为英文。若是文档，则其中页眉、页脚忽略。公式用latex格式表示，表格用html格式表示。 | OCR + İngilizce çeviri |
-
-**Dosyalar**:
-- `hunyuan-ocr-service/main.py` - FastAPI uygulaması
-- `hunyuan-ocr-service/client.py` - vLLM client wrapper + cleaning function
-
-**Bağımlılık**: `hunyuan-ocr-vllm` servisi hazır olmalı
-
-**Özellikler**:
-- ✅ Kullanıcı tarafından özelleştirilebilir promptlar
-- ✅ Temperature/token/sampling parametreleri ayarlanabilir
-- ✅ Çoklu görev desteği (OCR, parsing, translation)
-- ✅ Repeated substring cleaning (automatic)
-- ✅ Frontend'te hazır prompt şablonları
-
----
-
-### 5. iflas-pipeline-api (Port: 8003)
+### 3. iflas-pipeline-api (Port: 8003)
 **Rol**: İflas/İcra İlanı Analiz Pipeline'ı
 
 Gazete sayfalarındaki iflas ve icra ilanlarından yapılandırılmış bilgi çıkarır. İki aşamalı işlem:
@@ -528,7 +441,6 @@ location /api/v1/pipelines/mbr-kunye-batch-stream {
 | Servis | Port | Açıklama |
 |--------|------|----------|
 | `deepseek-ocr-api` | **8001** | DeepSeek OCR API (FastAPI) |
-| `hunyuan-ocr-api` | **8002** | HunyuanOCR API (FastAPI) |
 | `iflas-pipeline-api` | **8003** | İflas OCR Pipeline (OpenAI + OCR) |
 | `local-llm-api` | **8004** | Local Turkish-Gemma LLM (DISABLED) |
 | `mbr-kunye-pipeline` | **8006** | MBR Künye Pipeline API |
@@ -538,7 +450,6 @@ location /api/v1/pipelines/mbr-kunye-batch-stream {
 | Servis | Port | Açıklama |
 |--------|------|----------|
 | `deepseek-ocr-vllm` | **8101** | DeepSeek OCR Model Server |
-| `hunyuan-ocr-vllm` | **8102** | HunyuanOCR Model Server |
 
 ### Port Yapısı Avantajları
 ✅ **Sistematik**: API servisleri 8001-8010, vLLM servisleri 8101+  
