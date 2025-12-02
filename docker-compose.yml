@@ -89,6 +89,12 @@ services:
       - ./.cache/huggingface:/root/.cache/huggingface
     # 20% GPU memory as recommended in HunyuanOCR docs
     command: vllm serve tencent/HunyuanOCR --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8102 --trust-remote-code --gpu-memory-utilization 0.2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8102/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
     restart: unless-stopped
 
   # HunyuanOCR - API Service (FastAPI)
@@ -101,7 +107,8 @@ services:
     environment:
       - VLLM_URL=http://hunyuan-ocr-vllm:8102/v1
     depends_on:
-      - hunyuan-ocr-vllm
+      hunyuan-ocr-vllm:
+        condition: service_healthy
     restart: unless-stopped
 
   # Local Turkish-Gemma LLM - API Service (DISABLED)
