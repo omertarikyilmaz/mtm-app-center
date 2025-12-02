@@ -71,6 +71,39 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     restart: unless-stopped
 
+  # HunyuanOCR - Model Server (vLLM)
+  hunyuan-ocr-vllm:
+    build:
+      context: ./hunyuan-ocr-service
+      dockerfile: Dockerfile.vllm
+    ports:
+      - "8102:8102"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./.cache/huggingface:/root/.cache/huggingface
+    # 20% GPU memory as recommended in HunyuanOCR docs
+    command: vllm serve tencent/HunyuanOCR --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8102 --trust-remote-code --gpu-memory-utilization 0.2
+    restart: unless-stopped
+
+  # HunyuanOCR - API Service (FastAPI)
+  hunyuan-ocr-api:
+    build:
+      context: ./hunyuan-ocr-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - VLLM_URL=http://hunyuan-ocr-vllm:8102/v1
+    depends_on:
+      - hunyuan-ocr-vllm
+    restart: unless-stopped
+
   # Local Turkish-Gemma LLM - API Service (DISABLED)
   local-llm-api:
     build:

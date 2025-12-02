@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe } from 'lucide-react'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe, Sparkles, Copy, Check } from 'lucide-react'
 import './index.css'
 
 function App() {
@@ -18,6 +18,8 @@ function App() {
                 <Dashboard onViewChange={setCurrentView} />
             ) : currentView === 'ocr' ? (
                 <OCRInterface />
+            ) : currentView === 'hunyuan' ? (
+                <HunyuanOCRInterface />
             ) : currentView === 'pipelines' ? (
                 <IflasOCRInterface />
             ) : currentView === 'kunye' ? (
@@ -51,6 +53,13 @@ function Dashboard({ onViewChange }) {
             description: 'DeepSeek-V2 ve vLLM destekli gelişmiş optik karakter tanıma servisi.',
             icon: <ScanText size={32} color="#6366f1" />,
             status: 'Aktif'
+        },
+        {
+            id: 'hunyuan',
+            name: 'HunyuanOCR',
+            description: 'Tencent HunyuanOCR - Özelleştirilebilir prompt ve parametreler ile gelişmiş OCR.',
+            icon: <Sparkles size={32} color="#8b5cf6" />,
+            status: 'Yeni'
         },
         {
             id: 'pipelines',
@@ -1976,6 +1985,438 @@ function KunyeWebInterface() {
                 </div>
             </div >
         </div >
+    )
+}
+
+function HunyuanOCRInterface() {
+    const [selectedFiles, setSelectedFiles] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [results, setResults] = useState(null)
+    const [error, setError] = useState(null)
+    const [showHelp, setShowHelp] = useState(false)
+    const [copied, setCopied] = useState(false)
+    const fileInputRef = useRef(null)
+
+    // Parameters
+    const [prompt, setPrompt] = useState('检测并识别图片中的文字，将文本坐标格式化输出。')
+    const [temperature, setTemperature] = useState(0.0)
+    const [maxTokens, setMaxTokens] = useState(16384)
+    const [topP, setTopP] = useState(1.0)
+    const [topK, setTopK] = useState(-1)
+
+    const presetPrompts = [
+        {
+            name: 'Text Spotting (默认)',
+            prompt: '检测并识别图片中的文字，将文本坐标格式化输出。',
+            color: '#6366f1'
+        },
+        {
+            name: 'Table Parsing',
+            prompt: '把图中的表格解析为 HTML。',
+            color: '#f59e0b'
+        },
+        {
+            name: 'Formula Recognition',
+            prompt: '识别图片中的公式，用 LaTeX 格式表示。',
+            color: '#ec4899'
+        },
+        {
+            name: 'Document Parsing',
+            prompt: '提取文档图片中正文的所有信息用 markdown 格式表示，其中页眉、页脚部分忽略，表格用 html 格式表达，文档中公式用 latex 格式表示，按照阅读顺序组织进行解析。',
+            color: '#10b981'
+        },
+        {
+            name: 'Translation to English',
+            prompt: '先提取文字，再将文字内容翻译为英文。若是文档，则其中页眉、页脚忽略。公式用latex格式表示，表格用html格式表示。',
+            color: '#8b5cf6'
+        }
+    ]
+
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'))
+        if (files.length > 0) {
+            setSelectedFiles(files)
+            setResults(null)
+            setError(null)
+        } else {
+            setError('请选择有效的图片文件 (JPG, PNG, 等)')
+        }
+    }
+
+    const handleProcess = async () => {
+        if (selectedFiles.length === 0) return
+
+        setLoading(true)
+        setError(null)
+        setResults(null)
+
+        const formData = new FormData()
+        selectedFiles.forEach(file => formData.append('files', file))
+        formData.append('prompt', prompt)
+        formData.append('temperature', temperature.toString())
+        formData.append('max_tokens', maxTokens.toString())
+        formData.append('top_p', topP.toString())
+        formData.append('top_k', topK.toString())
+
+        try {
+            const response = await fetch('/api/v1/hunyuan-ocr', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+            }
+
+            const data = await response.json()
+            setResults(data)
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative' }}>
+            {/* Help button */}
+            <button
+                onClick={() => setShowHelp(!showHelp)}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    background: 'rgba(139, 92, 246, 0.1)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    borderRadius: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    color: '#8b5cf6',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 500
+                }}
+            >
+                <HelpCircle size={18} /> Nasıl Kullanırım?
+            </button>
+
+            {/* Help Modal */}
+            {showHelp && (
+                <>
+                    <div onClick={() => setShowHelp(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1999 }} />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'var(--bg-color)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '1rem',
+                        padding: '2rem',
+                        width: '90%',
+                        maxWidth: '700px',
+                        maxHeight: '85vh',
+                        overflow: 'auto',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                        zIndex: 2000
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#8b5cf6' }}>📖 HunyuanOCR Kullanım Kılavuzu</h2>
+                            <button onClick={() => setShowHelp(false)} style={{ background: 'none', border: 'none', fontSize: '2rem', cursor: 'pointer', color: '#8b5cf6' }}>×</button>
+                        </div>
+                        <div style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>
+                            <h3 style={{ color: '#8b5cf6', marginBottom: '0.5rem' }}>🎯 Ne İşe Yarar?</h3>
+                            <p>Tencent HunyuanOCR ile <strong>özelleştirilebilir promptlar</strong> kullanarak gelişmiş OCR işlemleri yapabilirsiniz. Metin tanıma, tablo çıkarımı, formül tanıma ve daha fazlası!</p>
+
+                            <h3 style={{ color: '#8b5cf6', marginTop: '1.5rem', marginBottom: '0.5rem' }}>📋 Öne Çıkan Özellikler:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li><strong>Özel Promptlar:</strong> İhtiyacınıza göre prompt yazabilirsiniz</li>
+                                <li><strong>Hazır Şablonlar:</strong> Text spotting, table parsing, formula recognition</li>
+                                <li><strong>Parametre Kontrolü:</strong> Temperature, max tokens, top-p ayarları</li>
+                                <li><strong>Çoklu Dil:</strong> Çince, İngilizce, Türkçe ve daha fazlası</li>
+                            </ul>
+
+                            <h3 style={{ color: '#8b5cf6', marginTop: '1.5rem', marginBottom: '0.5rem' }}>🎛️ Parametreler:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li><code>Temperature (0-1):</code> 0 = Deterministik, 1 = Yaratıcı</li>
+                                <li><code>Max Tokens:</code> Maksimum çıktı uzunluğu (512-16384)</li>
+                                <li><code>Top-p (0-1):</code> Nucleus sampling parametresi</li>
+                                <li><code>Top-k:</code> Top-k sampling (-1 = kapalı)</li>
+                            </ul>
+
+                            <h3 style={{ color: '#8b5cf6', marginTop: '1.5rem', marginBottom: '0.5rem' }}>💡 İpuçları:</h3>
+                            <ul style={{ paddingLeft: '1.5rem' }}>
+                                <li>Genel OCR için <strong>Temperature = 0</strong> kullanın</li>
+                                <li>Tablo/formül çıkarımı için <strong>Max Tokens</strong> yükseltin</li>
+                                <li>Kompleks dökümanlar için <strong>Document Parsing</strong> şablonunu deneyin</li>
+                            </ul>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <Sparkles size={32} color="#8b5cf6" />
+                </div>
+                <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>HunyuanOCR</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Tencent HunyuanOCR - Özelleştirilebilir Parametrelerle Gelişmiş OCR</p>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '2rem' }}>
+                {/* Left Column - Controls */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {/* File Upload */}
+                    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }}
+                        onClick={() => fileInputRef.current?.click()}>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="image/*"
+                            multiple
+                            style={{ display: 'none' }}
+                        />
+                        <Upload size={48} color="#8b5cf6" style={{ margin: '0 auto 1rem' }} />
+                        <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                            {selectedFiles.length > 0 ? `${selectedFiles.length} görsel seçildi` : 'Görsel Yükle'}
+                        </p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Çoklu seçim desteklenir
+                        </p>
+                    </div>
+
+                    {/* Preset Prompts */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: '#8b5cf6' }}>Hazır Promptlar</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {presetPrompts.map((preset, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setPrompt(preset.prompt)}
+                                    style={{
+                                        padding: '0.75rem',
+                                        background: prompt === preset.prompt ? `${preset.color}15` : 'var(--surface-color)',
+                                        border: `1px solid ${prompt === preset.prompt ? preset.color : 'var(--border-color)'}`,
+                                        borderRadius: '0.5rem',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '0.85rem',
+                                        fontWeight: prompt === preset.prompt ? 600 : 400,
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {preset.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Custom Prompt */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem', color: '#8b5cf6' }}>Özel Prompt</h3>
+                        <textarea
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            placeholder="Özel prompt girin..."
+                            style={{
+                                width: '100%',
+                                minHeight: '100px',
+                                padding: '0.75rem',
+                                background: 'var(--bg-color)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '0.5rem',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.9rem',
+                                fontFamily: 'inherit',
+                                resize: 'vertical'
+                            }}
+                        />
+                    </div>
+
+                    {/* Parameters */}
+                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', color: '#8b5cf6' }}>Parametreler</h3>
+
+                        {/* Temperature */}
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                                <span>Temperature:</span>
+                                <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{temperature.toFixed(2)}</span>
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={temperature}
+                                onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+
+                        {/* Max Tokens */}
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                                <span>Max Tokens:</span>
+                                <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{maxTokens}</span>
+                            </label>
+                            <input
+                                type="range"
+                                min="512"
+                                max="16384"
+                                step="512"
+                                value={maxTokens}
+                                onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+
+                        {/* Top-p */}
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                                <span>Top-p:</span>
+                                <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{topP.toFixed(2)}</span>
+                            </label>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={topP}
+                                onChange={(e) => setTopP(parseFloat(e.target.value))}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+
+                        {/* Top-k */}
+                        <div>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                                <span>Top-k:</span>
+                                <span style={{ color: '#8b5cf6', fontWeight: 600 }}>{topK === -1 ? 'Kapalı' : topK}</span>
+                            </label>
+                            <input
+                                type="number"
+                                min="-1"
+                                max="100"
+                                value={topK}
+                                onChange={(e) => setTopK(parseInt(e.target.value))}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.5rem',
+                                    background: 'var(--bg-color)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '0.5rem',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Process Button */}
+                    <button
+                        className="btn btn-primary"
+                        style={{ width: '100%', background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)', border: 'none' }}
+                        onClick={handleProcess}
+                        disabled={selectedFiles.length === 0 || loading}
+                    >
+                        {loading ? <><Loader2 className="loading-spinner" size={18} /> İşleniyor...</> : <><Sparkles size={18} /> OCR İşle</>}
+                    </button>
+                </div>
+
+                {/* Right Column - Results */}
+                <div className="glass-panel" style={{ padding: '2rem', maxHeight: '900px', overflowY: 'auto' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuçlar</h3>
+
+                    {loading && (
+                        <div style={{ textAlign: 'center', padding: '3rem' }}>
+                            <Loader2 className="loading-spinner" size={32} />
+                            <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>HunyuanOCR işleniyor...</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem' }}>
+                            <AlertCircle size={20} />
+                            {error}
+                        </div>
+                    )}
+
+                    {results && results.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {results.map((result, idx) => (
+                                <div key={idx} style={{
+                                    background: 'var(--surface-color)',
+                                    borderRadius: '0.75rem',
+                                    padding: '1.5rem',
+                                    border: '1px solid var(--border-color)'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                        <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#8b5cf6' }}>{result.filename}</h4>
+                                        <button
+                                            onClick={() => copyToClipboard(result.text)}
+                                            style={{
+                                                background: 'rgba(139, 92, 246, 0.1)',
+                                                border: '1px solid rgba(139, 92, 246, 0.3)',
+                                                borderRadius: '0.5rem',
+                                                padding: '0.5rem 0.75rem',
+                                                color: '#8b5cf6',
+                                                fontSize: '0.85rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem'
+                                            }}
+                                        >
+                                            {copied ? <><Check size={14} /> Kopyalandı</> : <><Copy size={14} /> Kopyala</>}
+                                        </button>
+                                    </div>
+
+                                    {/* Result Text */}
+                                    <div style={{
+                                        background: 'var(--bg-color)',
+                                        padding: '1rem',
+                                        borderRadius: '0.5rem',
+                                        marginBottom: '1rem',
+                                        maxHeight: '400px',
+                                        overflowY: 'auto'
+                                    }}>
+                                        <pre style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', fontSize: '0.9rem', margin: 0 }}>{result.text}</pre>
+                                    </div>
+
+                                    {/* Parameters Used */}
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                                        <span>Temp: <strong>{result.parameters.temperature}</strong></span>
+                                        <span>Tokens: <strong>{result.parameters.max_tokens}</strong></span>
+                                        <span>Top-p: <strong>{result.parameters.top_p}</strong></span>
+                                        <span>Top-k: <strong>{result.parameters.top_k}</strong></span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {!loading && !error && !results && (
+                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                            <Sparkles size={48} color="#8b5cf6" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                            <p>Görsel seçin ve parametrelerinizi ayarlayın</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     )
 }
 
