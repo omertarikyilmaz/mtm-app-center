@@ -1,7 +1,8 @@
 FROM python:3.10-slim
 
-# Install system dependencies (ffmpeg not needed, Whisper API handles it)
+# Install ffmpeg for audio processing (pydub dependency)
 RUN apt-get update && apt-get install -y \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

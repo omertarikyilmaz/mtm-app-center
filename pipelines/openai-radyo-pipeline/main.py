@@ -63,7 +63,8 @@ app.add_middleware(
 
 async def transcribe_audio(audio_path: Path, api_key: str) -> str:
     """
-    Transcribe entire audio file using OpenAI Whisper API
+    Transcribe entire audio file using OpenAI Whisper API.
+    For large files (>25MB), automatically chunks into segments.
     
     Args:
         audio_path: Path to audio file
@@ -73,19 +74,80 @@ async def transcribe_audio(audio_path: Path, api_key: str) -> str:
         Full transcript text
     """
     try:
+        from pydub import AudioSegment
+        import math
+        
         print(f"[DEBUG] Transcribing audio: {audio_path}")
+        
+        # Load audio file
+        audio = AudioSegment.from_file(str(audio_path))
+        duration_ms = len(audio)
+        duration_min = duration_ms / 60000
+        
+        print(f"[DEBUG] Audio duration: {duration_min:.1f} minutes")
+        
+        # Chunk size: 10 minutes (600,000 ms)
+        CHUNK_DURATION_MS = 10 * 60 * 1000
+        
+        # If file is small enough, process directly
+        if duration_ms <= CHUNK_DURATION_MS:
+            print(f"[DEBUG] File small enough, direct transcription")
+            client = openai.OpenAI(api_key=api_key)
+            
+            with open(audio_path, 'rb') as audio_file:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="tr",
+                    response_format="text"
+                )
+            
+            print(f"[DEBUG] Transcription complete ({len(transcript)} chars)")
+            return transcript
+        
+        # Large file - chunk it
+        num_chunks = math.ceil(duration_ms / CHUNK_DURATION_MS)
+        print(f"[DEBUG] Large file, splitting into {num_chunks} chunks")
+        
+        transcripts = []
         client = openai.OpenAI(api_key=api_key)
         
-        with open(audio_path, 'rb') as audio_file:
-            transcript = client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                language="tr",
-                response_format="text"
-            )
+        for i in range(num_chunks):
+            start_ms = i * CHUNK_DURATION_MS
+            end_ms = min((i + 1) * CHUNK_DURATION_MS, duration_ms)
+            
+            print(f"[DEBUG] Processing chunk {i+1}/{num_chunks} ({start_ms/60000:.1f}-{end_ms/60000:.1f} min)")
+            
+            # Extract chunk
+            chunk = audio[start_ms:end_ms]
+            
+            # Save chunk to temp file
+            chunk_path = audio_path.parent / f"chunk_{i}_{audio_path.name}"
+            chunk.export(str(chunk_path), format="mp3")
+            
+            try:
+                # Transcribe chunk
+                with open(chunk_path, 'rb') as chunk_file:
+                    chunk_transcript = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=chunk_file,
+                        language="tr",
+                        response_format="text"
+                    )
+                
+                transcripts.append(chunk_transcript)
+                print(f"[DEBUG] Chunk {i+1} transcribed ({len(chunk_transcript)} chars)")
+                
+            finally:
+                # Clean up chunk file
+                if chunk_path.exists():
+                    chunk_path.unlink()
         
-        print(f"[DEBUG] Transcription complete ({len(transcript)} chars)")
-        return transcript
+        # Combine all transcripts
+        full_transcript = " ".join(transcripts)
+        print(f"[DEBUG] All chunks transcribed, total: {len(full_transcript)} chars")
+        
+        return full_transcript
         
     except Exception as e:
         print(f"[ERROR] Transcription failed: {e}")
@@ -355,12 +417,7 @@ async def process_radyo_news_stream(
             file_size_mb = len(content) / 1024 / 1024
             yield f"data: {json.dumps({'type': 'progress', 'step': 'uploaded', 'message': f'Dosya yüklendi ({file_size_mb:.1f} MB)'})}\n\n"
             
-            # Check file size (Whisper API limit: 25MB)
-            if file_size_mb > 25:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Ses dosyası 25MB limitini aşıyor. Lütfen daha kısa bir kayıt yükleyin.'})}\n\n"
-                return
-            
-            # Step 2: Transcribe with Whisper
+            # Step 2: Transcribe with Whisper (auto-chunks if needed)
             yield f"data: {json.dumps({'type': 'progress', 'step': 'transcription', 'message': 'Whisper ile transkript alınıyor... (1-3 dakika sürebilir)'})}\n\n"
             
             transcript = await transcribe_audio(audio_path, openai_api_key)
