@@ -2210,23 +2210,16 @@ function RadyoNewsInterface() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                                     <Loader2 className="loading-spinner" size={24} color="#8b5cf6" />
                                     <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#8b5cf6' }}>
-                                        {progress.step === 'conversion' && '🔄 Dönüştürülüyor'}
-                                        {progress.step === 'segmentation' && '✂️ Segmentlere Ayrılıyor'}
-                                        {progress.step === 'merging' && '🔗 Birleştiriliyor'}
-                                        {progress.step === 'merged' && '✓ Hazır'}
-                                        {progress.step === 'transcription' && `🎤 Transkripsiyon (${progress.segment}/${progress.total})`}
-                                        {progress.step === 'analysis' && `🤖 Analiz (${progress.segment}/${progress.total})`}
-                                        {progress.isNews && '📰 Haber Bulundu!'}
+                                        {progress.step === 'uploaded' && '✓ Yüklendi'}
+                                        {progress.step === 'transcription' && '🎤 Whisper Transkript Alıyor...'}
+                                        {progress.step === 'transcribed' && '✓ Transkript Tamamlandı'}
+                                        {progress.step === 'analysis' && '🤖 GPT Haber Analizi Yapıyor...'}
+                                        {progress.step === 'analyzed' && '✓ Analiz Tamamlandı'}
                                     </span>
                                 </div>
                                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
                                     {progress.message}
                                 </p>
-                                {progress.title && (
-                                    <p style={{ color: '#8b5cf6', fontWeight: 600, marginTop: '0.5rem' }}>
-                                        {progress.title}
-                                    </p>
-                                )}
                             </div>
                         </div>
                     )}
@@ -2248,31 +2241,35 @@ function RadyoNewsInterface() {
 
                     {result && !loading && (
                         <div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-                                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#8b5cf6' }}>
-                                        {formatDuration(result.total_duration)}
-                                    </div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam Süre</div>
-                                </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
                                 <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{result.news_count}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Haber Sayısı</div>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{result.total_news_count}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam Haber</div>
                                 </div>
-                                <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }}>{result.total_segments}</div>
-                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Segment</div>
+                                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#8b5cf6' }}>{Object.keys(result.categories || {}).length}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Kategori</div>
                                 </div>
                             </div>
 
-                            <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '0.75rem', marginBottom: '2rem' }}>
-                                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Segment Dağılımı:</h4>
-                                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
-                                    <span>🎙️ Konuşma: <strong>{result.speech_segments}</strong></span>
-                                    <span>🎵 Müzik: <strong>{result.music_segments}</strong></span>
-                                    <span>🔇 Gürültü: <strong>{result.noise_segments}</strong></span>
+                            {result.categories && Object.keys(result.categories).length > 0 && (
+                                <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '0.75rem', marginBottom: '2rem' }}>
+                                    <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Kategori Dağılımı:</h4>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem' }}>
+                                        {Object.entries(result.categories).map(([cat, count]) => (
+                                            <span key={cat} style={{
+                                                padding: '0.25rem 0.75rem',
+                                                background: 'rgba(99, 102, 241, 0.1)',
+                                                borderRadius: '1rem',
+                                                color: '#6366f1',
+                                                fontWeight: 600
+                                            }}>
+                                                {cat}: {count}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {result.news_items && result.news_items.length > 0 ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -2284,8 +2281,8 @@ function RadyoNewsInterface() {
                                             border: '1px solid rgba(16, 185, 129, 0.2)'
                                         }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
-                                                <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#10b981', margin: 0 }}>
-                                                    {news.baslik || `Haber ${idx + 1}`}
+                                                <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#10b981', margin: 0, flex: 1 }}>
+                                                    {news.baslik}
                                                 </h4>
                                                 <span style={{
                                                     padding: '0.25rem 0.75rem',
@@ -2293,9 +2290,11 @@ function RadyoNewsInterface() {
                                                     background: '#8b5cf6',
                                                     color: 'white',
                                                     fontSize: '0.75rem',
-                                                    fontWeight: 600
+                                                    fontWeight: 600,
+                                                    marginLeft: '1rem',
+                                                    whiteSpace: 'nowrap'
                                                 }}>
-                                                    {formatTime(news.start_time)} - {formatTime(news.end_time)}
+                                                    {news.kategori}
                                                 </span>
                                             </div>
 
@@ -2312,7 +2311,8 @@ function RadyoNewsInterface() {
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(16, 185, 129, 0.2)' }}>
                                                 {news.tarih && <span style={{ color: 'var(--text-secondary)' }}>📅 {news.tarih}</span>}
                                                 {news.kisiler && news.kisiler.length > 0 && <span style={{ color: 'var(--text-secondary)' }}>👤 {news.kisiler.join(', ')}</span>}
-                                                {news.konular && news.konular.length > 0 && <span style={{ color: 'var(--text-secondary)' }}>🏷️ {news.konular.join(', ')}</span>}
+                                                {news.kurumlar && news.kurumlar.length > 0 && <span style={{ color: 'var(--text-secondary)' }}>🏢 {news.kurumlar.join(', ')}</span>}
+                                                {news.yerler && news.yerler.length > 0 && <span style={{ color: 'var(--text-secondary)' }}>📍 {news.yerler.join(', ')}</span>}
                                             </div>
                                         </div>
                                     ))}

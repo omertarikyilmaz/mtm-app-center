@@ -1,9 +1,7 @@
-FROM tensorflow/tensorflow:2.15.0-gpu
+FROM python:3.10-slim
 
-# Install system dependencies
+# Install system dependencies (ffmpeg not needed, Whisper API handles it)
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

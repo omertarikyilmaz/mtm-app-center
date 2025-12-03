@@ -2,20 +2,15 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import openai
 import os
 import json
 import tempfile
 import asyncio
 from pathlib import Path
-import shutil
 
-# Audio processing imports
-from inaSpeechSegmenter import Segmenter
-from pydub import AudioSegment
-
-app = FastAPI(title="MTM Radyo News Pipeline", version="1.0.0")
+app = FastAPI(title="MTM Radyo News Pipeline", version="2.0.0")
 
 # Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
@@ -23,38 +18,23 @@ TEMP_AUDIO_DIR = Path("/tmp/audio")
 TEMP_AUDIO_DIR.mkdir(exist_ok=True, parents=True)
 
 # Models
-class RadioSegment(BaseModel):
-    """Audio segment information"""
-    start_time: float  # seconds
-    end_time: float  # seconds
-    duration: float  # seconds
-    segment_type: str  # 'speech', 'music', 'noise'
-    gender: Optional[str] = None  # 'male', 'female' (not used in our case)
-
 class NewsItem(BaseModel):
     """Structured news item"""
-    segment_index: int
-    start_time: float
-    end_time: float
-    duration: float
-    baslik: Optional[str] = None
-    ozet: Optional[str] = None
+    baslik: str
+    kategori: str  # politika, ekonomi, spor, saglik, teknoloji, guncel, diger
+    ozet: str  # 2-3 cümle
     tam_metin: str
     tarih: Optional[str] = None
     kisiler: Optional[List[str]] = None
-    konular: Optional[List[str]] = None
-    is_news: bool = True
+    kurumlar: Optional[List[str]] = None
+    yerler: Optional[List[str]] = None
 
 class RadioAnalysisResult(BaseModel):
     """Complete analysis result"""
-    total_duration: float  # seconds
-    total_segments: int
-    speech_segments: int
-    music_segments: int
-    noise_segments: int
-    news_count: int
-    segments: List[RadioSegment]
+    total_news_count: int
+    categories: dict  # kategori: sayı
     news_items: List[NewsItem]
+    raw_transcript: str
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -63,12 +43,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     print(f"Global Error: {error_details}")
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Global Server Error: {str(exc)}"},
+        content={"detail": f"Server Error: {str(exc)}"},
     )
 
 @app.get("/")
 async def root():
-    return {"status": "running", "service": "openai-radyo-pipeline"}
+    return {"status": "running", "service": "openai-radyo-pipeline", "version": "2.0.0"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,237 +60,240 @@ app.add_middleware(
 
 # Core Functions
 
-def convert_to_wav(input_path: Path, output_path: Path) -> bool:
-    """Convert any audio format to WAV using pydub"""
-    try:
-        print(f"[DEBUG] Converting {input_path} to WAV...")
-        audio = AudioSegment.from_file(str(input_path))
-        audio.export(str(output_path), format='wav')
-        print(f"[DEBUG] Conversion successful: {output_path}")
-        return True
-    except Exception as e:
-        print(f"[ERROR] Audio conversion failed: {e}")
-        return False
-
-def segment_audio(audio_path: Path) -> List[RadioSegment]:
+async def transcribe_audio(audio_path: Path, api_key: str) -> str:
     """
-    Segment audio into speech, music, and noise using inaSpeechSegmenter
-    
-    Returns:
-        List of RadioSegment objects
-    """
-    try:
-        print(f"[DEBUG] Initializing segmenter...")
-        # Initialize segmenter with 'smn' (speech/music/noise) engine
-        # Skip gender detection for performance
-        seg = Segmenter(vad_engine='smn', detect_gender=False)
-        
-        print(f"[DEBUG] Segmenting audio: {audio_path}")
-        # Segmentation returns: [(label, start, end), ...]
-        # label can be: 'speech', 'music', 'noise'
-        segmentation = seg(str(audio_path))
-        
-        segments = []
-        for label, start, end in segmentation:
-            duration = end - start
-            segments.append(RadioSegment(
-                start_time=start,
-                end_time=end,
-                duration=duration,
-                segment_type=label,
-                gender=None
-            ))
-        
-        print(f"[DEBUG] Segmentation complete: {len(segments)} segments found")
-        return segments
-        
-    except Exception as e:
-        print(f"[ERROR] Segmentation failed: {e}")
-        raise
-
-def merge_speech_segments(segments: List[RadioSegment], max_gap_seconds: float = 5.0) -> List[RadioSegment]:
-    """
-    Merge close speech segments to form news blocks
+    Transcribe entire audio file using OpenAI Whisper API
     
     Args:
-        segments: List of all segments
-        max_gap_seconds: Maximum gap between speech segments to merge (default: 5s)
-    
-    Returns:
-        List of merged speech segments
-    """
-    speech_segments = [s for s in segments if s.segment_type == 'speech']
-    
-    if not speech_segments:
-        return []
-    
-    # Sort by start time
-    speech_segments.sort(key=lambda x: x.start_time)
-    
-    merged = []
-    current = speech_segments[0]
-    
-    for next_seg in speech_segments[1:]:
-        gap = next_seg.start_time - current.end_time
-        
-        if gap <= max_gap_seconds:
-            # Merge segments
-            current = RadioSegment(
-                start_time=current.start_time,
-                end_time=next_seg.end_time,
-                duration=next_seg.end_time - current.start_time,
-                segment_type='speech',
-                gender=None
-            )
-        else:
-            # Save current and start new
-            merged.append(current)
-            current = next_seg
-    
-    # Add last segment
-    merged.append(current)
-    
-    # Filter out very short segments (< 15 seconds - likely jingles/transitions)
-    merged = [s for s in merged if s.duration >= 15.0]
-    
-    print(f"[DEBUG] Merged {len(speech_segments)} speech segments into {len(merged)} blocks")
-    return merged
-
-def extract_audio_segment(input_path: Path, output_path: Path, start_sec: float, end_sec: float) -> bool:
-    """Extract a segment from audio file"""
-    try:
-        audio = AudioSegment.from_wav(str(input_path))
-        segment = audio[start_sec * 1000:end_sec * 1000]  # pydub uses milliseconds
-        segment.export(str(output_path), format='wav')
-        return True
-    except Exception as e:
-        print(f"[ERROR] Failed to extract segment: {e}")
-        return False
-
-async def transcribe_segment(segment_path: Path, api_key: str) -> str:
-    """
-    Transcribe audio segment using OpenAI Whisper API
-    
-    Args:
-        segment_path: Path to WAV segment
+        audio_path: Path to audio file
         api_key: OpenAI API key
     
     Returns:
-        Transcribed text
+        Full transcript text
     """
     try:
-        print(f"[DEBUG] Transcribing segment: {segment_path}")
+        print(f"[DEBUG] Transcribing audio: {audio_path}")
         client = openai.OpenAI(api_key=api_key)
         
-        with open(segment_path, 'rb') as audio_file:
+        with open(audio_path, 'rb') as audio_file:
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
-                language="tr",  # Turkish
+                language="tr",
                 response_format="text"
             )
         
-        print(f"[DEBUG] Transcription successful ({len(transcript)} chars)")
+        print(f"[DEBUG] Transcription complete ({len(transcript)} chars)")
         return transcript
         
     except Exception as e:
         print(f"[ERROR] Transcription failed: {e}")
         raise
 
-def create_news_extraction_prompt(transcript: str) -> str:
-    """Create prompt for GPT to classify and extract news"""
-    return f"""Sen radyo haber içeriklerini analiz eden bir yapay zekasın.
+def create_news_extraction_prompt() -> str:
+    """Create detailed prompt for GPT to extract news from transcript"""
+    return """Sen bir profesyonel radyo haber analisti ve editörüsün. Uzun yıllardır radyo yayınlarını analiz ediyorsun.
 
-Aşağıdaki radyo transkripti verilmiştir. Bu metnin bir HABER içeriği mi yoksa REKLAM/MÜZİK/SÖYLEŞI/DİĞER mi olduğunu tespit et.
+**GÖREVİN:**
+Aşağıda bir radyo kanalının 1 saatlik yayın transkripsiyonu verilecek. Bu transkriptte:
+- Haberler
+- Reklamlar
+- Müzik programları
+- Jingle'lar
+- Sunucu sohbetleri
+- Program tanıtımları
+karışık halde bulunuyor.
 
-**HABER TESPİTİ KURALLARI:**
-- Güncel olaylar, politika, ekonomi, spor, hava durumu, trafik gibi bilgilendirici içerikler HABERDIR
-- Ürün tanıtımı, reklam sloganları, satış ilanları REKLAM'dır (is_news: false)
-- Müzik sözleri, şarkı tanıtımı MÜZİK'tir (is_news: false)
-- Genel sohbet, röportaj, program tanıtımı SÖYLEŞI'dir (is_news: false)
+**SADECE HABER İÇERİKLERİNİ** tespit edip yapılandırılmış formatta döndürmelisin.
 
-**EĞER HABER İSE:**
-- **baslik**: Haberin kısa başlığı (5-10 kelime)
-- **ozet**: Haberin özeti (1-2 cümle)
-- **tam_metin**: Transkript metni aynen
-- **tarih**: Metinde geçen tarih bilgisi varsa (format: GG.AA.YYYY veya serbest)
-- **kisiler**: Metinde geçen önemli kişi/kurum isimleri (liste)
-- **konular**: Ana konular/etiketler (örn: ["politika", "ekonomi"])
-- **is_news**: true
+---
 
-**EĞER HABER DEĞİLSE:**
-- **tam_metin**: Transkript metni aynen
-- **is_news**: false
-- Diğer alanlar null
+## 🚫 HABER OLMAYAN İÇERİKLER (ATLANMALI):
 
-**TRANSKRİPT:**
-{transcript}
+1. **REKLAMLAR:**
+   - Ürün/hizmet tanıtımları ("...satın alın", "...arayın", "kampanya", "indirim")
+   - Marka/şirket isimleri (ürün reklamı bağlamında)
+   - Telefon numaraları, web siteleri (reklam bağlamında)
+   - "Sponsorumuz", "Destekçimiz" gibi ifadeler
 
-**JSON ŞEMASI:**
-{{
-  "baslik": "string veya null",
-  "ozet": "string veya null",
-  "tam_metin": "string",
-  "tarih": "string veya null",
-  "kisiler": ["string"] veya null,
-  "konular": ["string"] veya null,
-  "is_news": boolean
-}}
+2. **MÜZİK PROGRAMLARI:**
+   - Şarkı sözleri
+   - Şarkıcı/albüm tanıtımları
+   - Müzik listesi/chart haberleri
+   - "Bu hafta en çok dinlenen" gibi içerikler
+
+3. **PROGRAM İÇERİKLERİ:**
+   - Sunucu sohbetleri (haber dışı)
+   - Program tanıtımları
+   - Dinleyici mesajları
+   - Jingle'lar, ara müzikleri
+
+4. **DİĞER:**
+   - Hava durumu tahmini (önemli hava olayı değilse)
+   - Bugün tarihte ne oldu
+   - Horoskop/astroloji
+   - Eğlence/magazin (önemsiz dedikodu)
+
+---
+
+## ✅ HABER OLAN İÇERİKLER (ALINMALI):
+
+1. **POLİTİKA:**
+   - Hükümet kararları, yasalar
+   - Seçimler, referandumlar
+   - Siyasi açıklamalar (önemli)
+   - Uluslararası ilişkiler
+
+2. **EKONOMİ:**
+   - Ekonomik veriler (enflasyon, büyüme, işsizlik)
+   - Borsa, döviz, altın haberleri
+   - Şirket haberleri (önemli gelişmeler)
+   - Ekonomi politikaları
+
+3. **SPOR:**
+   - Maç sonuçları (önemli müsabakalar)
+   - Transfer haberleri
+   - Şampiyonluklar, milli takım
+   - Spor politikaları
+
+4. **GÜNCEL OLAYLAR:**
+   - Kazalar, yangınlar, doğal afetler
+   - Suç haberleri (önemli)
+   - Protestolar, toplumsal olaylar
+   - Mahkeme kararları
+
+5. **SAĞLIK & BİLİM:**
+   - Salgınlar, aşılar
+   - Bilimsel keşifler
+   - Sağlık politikaları
+
+6. **TEKNOLOJİ:**
+   - Önemli teknoloji gelişmeleri
+   - Siber güvenlik olayları
+   - Yapay zeka, uzay haberleri
+
+7. **KÜLTÜR & EĞİTİM:**
+   - Önemli kültürel etkinlikler
+   - Eğitim politikaları
+   - Üniversite gelişmeleri
+
+---
+
+## 📋 ÇIKTI FORMATI:
+
+Her haber için şu bilgileri çıkar:
+
+```json
+{
+  "baslik": "Kısa, öz başlık (5-10 kelime)",
+  "kategori": "politika|ekonomi|spor|saglik|teknoloji|guncel|diger",
+  "ozet": "2-3 cümlelik özet. Ana olay ve sonucu içermeli.",
+  "tam_metin": "Haberin transkriptteki tam metni (aynen)",
+  "tarih": "Metinde geçiyorsa tarih/saat bilgisi (örn: '3 Aralık 2024', '15:30')",
+  "kisiler": ["Metinde geçen kişi isimleri"],
+  "kurumlar": ["Bahsedilen kurum/kuruluşlar"],
+  "yerler": ["Bahsedilen şehir/ülke isimleri"]
+}
+```
+
+---
+
+## ⚠️ ÖNEMLİ KURALLAR:
+
+1. **NET HABER OLMAYAN HİÇBİR ŞEY EKLEME**
+   - Şüpheli içerikleri atla
+   - "Belki haber olabilir" deme, emin ol
+
+2. **REKLAM TESPİTİ:**
+   - Ürün/marka ismi + övgü = REKLAM
+   - Telefon/web adresi = REKLAM
+   - "Kampanya", "indirim", "satın al" = REKLAM
+
+3. **KATEGORİ SINIFLANDIRMASI:**
+   - Her haberi en uygun kategoriye ata
+   - Kararsızsan "guncel" kullan
+   - "diger" sadece hiçbiri uymuyorsa
+
+4. **ÖZ VE NET OL:**
+   - Başlık: Kısa ve açıklayıcı
+   - Özet: Sadece önemli bilgiler
+   - Tam metin: Transkriptteki ilgili kısmın tamamı
+
+5. **BOŞLUK OLMASIN:**
+   - Hiç haber yoksa bile boş array dön: `{"news_items": []}`
+   - `null` veya `undefined` döndürme
+
+---
+
+## 📤 JSON ŞEMASI:
+
+```json
+{
+  "news_items": [
+    {
+      "baslik": "string",
+      "kategori": "politika|ekonomi|spor|saglik|teknoloji|guncel|diger",
+      "ozet": "string",
+      "tam_metin": "string",
+      "tarih": "string veya null",
+      "kisiler": ["string"] veya null,
+      "kurumlar": ["string"] veya null,
+      "yerler": ["string"] veya null
+    }
+  ]
+}
+```
+
+**SADECE GEÇERLİ JSON DÖNDÜR. AÇIKLAMA YAPMA.**
 """
 
-async def classify_and_extract_news(transcript: str, segment_index: int, start_time: float, end_time: float, api_key: str) -> Optional[NewsItem]:
+async def extract_news_from_transcript(transcript: str, api_key: str) -> List[NewsItem]:
     """
-    Classify transcript and extract structured news data using GPT
+    Extract news items from transcript using GPT-4o-mini
+    
+    Args:
+        transcript: Full radio transcript
+        api_key: OpenAI API key
     
     Returns:
-        NewsItem if it's news, None otherwise
+        List of NewsItem objects
     """
     try:
-        print(f"[DEBUG] Classifying segment {segment_index}...")
+        print(f"[DEBUG] Extracting news from transcript ({len(transcript)} chars)")
         client = openai.OpenAI(api_key=api_key)
         
-        prompt = create_news_extraction_prompt(transcript)
+        system_prompt = create_news_extraction_prompt()
+        user_prompt = f"**RADYO TRANSKRİPTİ:**\n\n{transcript}\n\n---\n\n**Yukarıdaki transkriptten SADECE HABER içeriklerini JSON formatında çıkar:**"
         
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Sen radyo haber analiz asistanısın. Sadece geçerli JSON döndür."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ],
             temperature=0.1,
-            max_tokens=1500,
+            max_tokens=16000,
             response_format={"type": "json_object"}
         )
         
-        extracted_data = json.loads(response.choices[0].message.content)
+        result_text = response.choices[0].message.content
+        result_data = json.loads(result_text)
         
-        # Create NewsItem
-        news_item = NewsItem(
-            segment_index=segment_index,
-            start_time=start_time,
-            end_time=end_time,
-            duration=end_time - start_time,
-            **extracted_data
-        )
+        news_items = []
+        for item in result_data.get('news_items', []):
+            try:
+                news_item = NewsItem(**item)
+                news_items.append(news_item)
+            except Exception as e:
+                print(f"[WARNING] Failed to parse news item: {e}")
+                continue
         
-        if news_item.is_news:
-            print(f"[DEBUG] ✓ News detected: {news_item.baslik}")
-            return news_item
-        else:
-            print(f"[DEBUG] ✗ Not news (reklam/müzik/diğer)")
-            return None
+        print(f"[DEBUG] Extracted {len(news_items)} news items")
+        return news_items
         
     except Exception as e:
-        print(f"[ERROR] Classification failed: {e}")
-        # Return the transcript as-is on error
-        return NewsItem(
-            segment_index=segment_index,
-            start_time=start_time,
-            end_time=end_time,
-            duration=end_time - start_time,
-            tam_metin=transcript,
-            is_news=False
-        )
+        print(f"[ERROR] News extraction failed: {e}")
+        raise
 
 def cleanup_temp_files(file_paths: List[Path]):
     """Delete temporary files"""
@@ -346,87 +329,52 @@ async def process_radyo_news_stream(
             # Step 1: Save uploaded file
             yield f"data: {json.dumps({'type': 'init', 'message': 'Ses dosyası yüklendi, işleme başlıyor...'})}\n\n"
             
-            # Save original file
-            original_ext = Path(file.filename).suffix if file.filename else '.mp3'
-            original_path = TEMP_AUDIO_DIR / f"radio_{id(file)}{original_ext}"
-            temp_files.append(original_path)
+            # Save audio file
+            file_ext = Path(file.filename).suffix if file.filename else '.mp3'
+            audio_path = TEMP_AUDIO_DIR / f"radio_{id(file)}{file_ext}"
+            temp_files.append(audio_path)
             
-            with open(original_path, 'wb') as f:
+            with open(audio_path, 'wb') as f:
                 content = await file.read()
                 f.write(content)
             
-            # Step 2: Convert to WAV
-            yield f"data: {json.dumps({'type': 'progress', 'step': 'conversion', 'message': 'Ses dosyası WAV formatına dönüştürülüyor...'})}\n\n"
+            file_size_mb = len(content) / 1024 / 1024
+            yield f"data: {json.dumps({'type': 'progress', 'step': 'uploaded', 'message': f'Dosya yüklendi ({file_size_mb:.1f} MB)'})}\n\n"
             
-            wav_path = TEMP_AUDIO_DIR / f"radio_{id(file)}.wav"
-            temp_files.append(wav_path)
-            
-            if not convert_to_wav(original_path, wav_path):
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Ses dosyası dönüştürülemedi'})}\n\n"
+            # Check file size (Whisper API limit: 25MB)
+            if file_size_mb > 25:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Ses dosyası 25MB limitini aşıyor. Lütfen daha kısa bir kayıt yükleyin.'})}\n\n"
                 return
             
-            # Step 3: Segment audio
-            yield f"data: {json.dumps({'type': 'progress', 'step': 'segmentation', 'message': 'Ses segmentlere ayrılıyor (konuşma/müzik/gürültü)...'})}\n\n"
+            # Step 2: Transcribe with Whisper
+            yield f"data: {json.dumps({'type': 'progress', 'step': 'transcription', 'message': 'Whisper ile transkript alınıyor... (1-3 dakika sürebilir)'})}\n\n"
             
-            all_segments = segment_audio(wav_path)
+            transcript = await transcribe_audio(audio_path, openai_api_key)
             
-            # Step 4: Merge speech segments
-            yield f"data: {json.dumps({'type': 'progress', 'step': 'merging', 'message': f'{len(all_segments)} segment bulundu, konuşma blokları birleştiriliyor...'})}\n\n"
+            if not transcript or len(transcript) < 100:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Transkript alınamadı veya çok kısa. Ses dosyasını kontrol edin.'})}\n\n"
+                return
             
-            speech_blocks = merge_speech_segments(all_segments, max_gap_seconds=5.0)
+            yield f"data: {json.dumps({'type': 'progress', 'step': 'transcribed', 'message': f'✓ Transkript alındı ({len(transcript)} karakter)'})}\n\n"
             
-            yield f"data: {json.dumps({'type': 'progress', 'step': 'merged', 'message': f'{len(speech_blocks)} konuşma bloğu tespit edildi'})}\n\n"
+            # Step 3: Extract news with GPT
+            yield f"data: {json.dumps({'type': 'progress', 'step': 'analysis', 'message': 'GPT ile haber analizi yapılıyor... (30-60 saniye)'})}\n\n"
             
-            # Step 5: Process each speech block
-            news_items = []
+            news_items = await extract_news_from_transcript(transcript, openai_api_key)
             
-            for idx, block in enumerate(speech_blocks, start=1):
-                # Extract segment
-                segment_path = TEMP_AUDIO_DIR / f"segment_{id(file)}_{idx}.wav"
-                temp_files.append(segment_path)
-                
-                yield f"data: {json.dumps({'type': 'progress', 'step': 'transcription', 'segment': idx, 'total': len(speech_blocks), 'message': f'Segment {idx}/{len(speech_blocks)}: Metne dönüştürülüyor...'})}\n\n"
-                
-                if not extract_audio_segment(wav_path, segment_path, block.start_time, block.end_time):
-                    continue
-                
-                # Transcribe
-                try:
-                    transcript = await transcribe_segment(segment_path, openai_api_key)
-                except Exception as e:
-                    yield f"data: {json.dumps({'type': 'error', 'segment': idx, 'message': f'Transkripsiyon hatası: {str(e)}'})}\n\n"
-                    continue
-                
-                # Classify and extract
-                yield f"data: {json.dumps({'type': 'progress', 'step': 'analysis', 'segment': idx, 'total': len(speech_blocks), 'message': f'Segment {idx}/{len(speech_blocks)}: Haber analizi yapılıyor...'})}\n\n"
-                
-                news_item = await classify_and_extract_news(
-                    transcript, idx, block.start_time, block.end_time, openai_api_key
-                )
-                
-                if news_item and news_item.is_news:
-                    news_items.append(news_item)
-                    yield f"data: {json.dumps({'type': 'news_found', 'segment': idx, 'title': news_item.baslik, 'message': f'✓ Haber bulundu: {news_item.baslik}'})}\n\n"
-                
-                # Small delay
-                await asyncio.sleep(0.2)
+            yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzed', 'message': f'✓ Analiz tamamlandı! {len(news_items)} haber bulundu'})}\n\n"
             
             # Calculate statistics
-            total_duration = float(all_segments[-1].end_time) if all_segments else 0.0
-            speech_count = sum(1 for s in all_segments if s.segment_type == 'speech')
-            music_count = sum(1 for s in all_segments if s.segment_type == 'music')
-            noise_count = sum(1 for s in all_segments if s.segment_type == 'noise')
+            categories = {}
+            for news in news_items:
+                categories[news.kategori] = categories.get(news.kategori, 0) + 1
             
-            # Step 6: Send complete result
+            # Step 4: Send complete result
             result = RadioAnalysisResult(
-                total_duration=total_duration,
-                total_segments=len(all_segments),
-                speech_segments=speech_count,
-                music_segments=music_count,
-                noise_segments=noise_count,
-                news_count=len(news_items),
-                segments=all_segments,
-                news_items=news_items
+                total_news_count=len(news_items),
+                categories=categories,
+                news_items=news_items,
+                raw_transcript=transcript
             )
             
             yield f"data: {json.dumps({'type': 'complete', 'result': result.dict(), 'message': f'✓ Tamamlandı! {len(news_items)} haber bulundu'})}\n\n"
