@@ -2063,28 +2063,30 @@ function RadyoNewsInterface() {
                         try {
                             const data = JSON.parse(line.substring(6))
 
+                            console.log('[DEBUG] SSE Event:', data.type, data)
+
                             if (data.type === 'init') {
                                 setProgress({ message: data.message, step: 'init' })
                             } else if (data.type === 'progress') {
                                 setProgress(data)
-                            } else if (data.type === 'news_found') {
-                                setProgress({ ...data, isNews: true })
                             } else if (data.type === 'complete') {
+                                console.log('[DEBUG] Complete event received, result:', data.result)
                                 setResult(data.result)
                                 setProgress(null)
                                 setLoading(false)
                             } else if (data.type === 'error') {
+                                console.error('[ERROR] Server error:', data.message)
                                 setError(data.message)
                                 setLoading(false)
                             }
                         } catch (e) {
-                            console.error('Parse error:', e)
+                            console.error('SSE Parse error:', e, 'Line:', line)
                         }
                     }
                 }
             }
         } catch (err) {
-            console.error('Error:', err)
+            console.error('Fetch Error:', err)
             setError(err.message)
             setLoading(false)
         }
