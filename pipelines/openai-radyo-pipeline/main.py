@@ -85,6 +85,7 @@ async def transcribe_audio(audio_path: Path, api_key: str) -> str:
         duration_min = duration_ms / 60000
         
         print(f"[DEBUG] Audio duration: {duration_min:.1f} minutes")
+        print(f"[PROGRESS] DURATION:{duration_min}")  # Special format for progress parsing
         
         # Chunk size: 10 minutes (600,000 ms)
         CHUNK_DURATION_MS = 10 * 60 * 1000
@@ -108,6 +109,7 @@ async def transcribe_audio(audio_path: Path, api_key: str) -> str:
         # Large file - chunk it
         num_chunks = math.ceil(duration_ms / CHUNK_DURATION_MS)
         print(f"[DEBUG] Large file, splitting into {num_chunks} chunks")
+        print(f"[PROGRESS] CHUNKS:{num_chunks}")  # Special format for progress parsing
         
         transcripts = []
         client = openai.OpenAI(api_key=api_key)
@@ -116,6 +118,7 @@ async def transcribe_audio(audio_path: Path, api_key: str) -> str:
             start_ms = i * CHUNK_DURATION_MS
             end_ms = min((i + 1) * CHUNK_DURATION_MS, duration_ms)
             
+            print(f"[PROGRESS] CHUNK:{i+1}/{num_chunks}")  # Special format for progress
             print(f"[DEBUG] Processing chunk {i+1}/{num_chunks} ({start_ms/60000:.1f}-{end_ms/60000:.1f} min)")
             
             # Extract chunk
@@ -426,13 +429,13 @@ async def process_radyo_news_stream(
             file_size_mb = len(content) / 1024 / 1024
             yield f"data: {json.dumps({'type': 'progress', 'step': 'uploaded', 'message': f'Dosya yüklendi ({file_size_mb:.1f} MB)'})}\n\n"
             
-            # Step 2: Transcribe with Whisper (auto-chunks if needed)
-            yield f"data: {json.dumps({'type': 'progress', 'step': 'transcription', 'message': 'Whisper ile transkript alınıyor... (1-3 dakika sürebilir)'})}\n\n"
+            # Step 2: Transcribe with Whisper (auto-chunks if needed, check logs for chunk progress)
+            yield f"data: {json.dumps({'type': 'progress', 'step': 'transcription', 'message': 'Whisper ile transkript alınıyor... (büyük dosyalar 5-10 dakika sürebilir)'})}\n\n"
             
             transcript = await transcribe_audio(audio_path, openai_api_key)
             
             if not transcript or len(transcript) < 100:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'Transkript alınamadı veya çok kısa. Ses dosyasını kontrol edin.'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Transkript alınamadı veya çok kısa. Ses file_size_mbdosyasını kontrol edin.'})}\n\n"
                 return
             
             yield f"data: {json.dumps({'type': 'progress', 'step': 'transcribed', 'message': f'✓ Transkript alındı ({len(transcript)} karakter)'})}\n\n"
