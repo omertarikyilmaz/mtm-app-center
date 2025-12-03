@@ -2050,27 +2050,33 @@ function RadyoNewsInterface() {
 
             const reader = response.body.getReader()
             const decoder = new TextDecoder()
+            let buffer = '' // Buffer for incomplete lines
 
             while (true) {
                 const { done, value } = await reader.read()
                 if (done) break
 
-                const chunk = decoder.decode(value)
-                const lines = chunk.split('\n')
+                // Decode chunk and add to buffer
+                buffer += decoder.decode(value, { stream: true })
+
+                // Split by newlines, keeping incomplete last line in buffer
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || '' // Keep incomplete line
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
-                            const data = JSON.parse(line.substring(6))
+                            const jsonStr = line.substring(6)
+                            const data = JSON.parse(jsonStr)
 
-                            console.log('[DEBUG] SSE Event:', data.type, data)
+                            console.log('[DEBUG] SSE Event:', data.type)
 
                             if (data.type === 'init') {
                                 setProgress({ message: data.message, step: 'init' })
                             } else if (data.type === 'progress') {
                                 setProgress(data)
                             } else if (data.type === 'complete') {
-                                console.log('[DEBUG] Complete event received, result:', data.result)
+                                console.log('[DEBUG] Complete event, news count:', data.result?.total_news_count)
                                 setResult(data.result)
                                 setProgress(null)
                                 setLoading(false)
@@ -2080,7 +2086,7 @@ function RadyoNewsInterface() {
                                 setLoading(false)
                             }
                         } catch (e) {
-                            console.error('SSE Parse error:', e, 'Line:', line)
+                            console.error('SSE Parse error:', e.message, 'Line length:', line.length)
                         }
                     }
                 }
