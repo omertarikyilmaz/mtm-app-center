@@ -457,7 +457,17 @@ async def process_radyo_news_stream(
                 raw_transcript=transcript
             )
             
-            yield f"data: {json.dumps({'type': 'complete', 'result': result.dict(), 'message': f'✓ Tamamlandı! {len(news_items)} haber bulundu'})}\n\n"
+            # Serialize result (Pydantic v2 uses model_dump instead of dict)
+            try:
+                result_dict = result.model_dump()
+            except AttributeError:
+                # Fallback for Pydantic v1
+                result_dict = result.dict()
+            
+            result_json = json.dumps({'type': 'complete', 'result': result_dict, 'message': f'✓ Tamamlandı! {len(news_items)} haber bulundu'})
+            print(f"[DEBUG] Sending result JSON ({len(result_json)} bytes)")
+            
+            yield f"data: {result_json}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': f'Hata: {str(e)}'})}\n\n"
