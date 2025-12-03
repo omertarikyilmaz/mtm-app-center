@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe } from 'lucide-react'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe, Radio } from 'lucide-react'
 import './index.css'
 
 function App() {
@@ -24,6 +24,8 @@ function App() {
                 <KunyeInterface />
             ) : currentView === 'kunye-web' ? (
                 <KunyeWebInterface />
+            ) : currentView === 'radyo' ? (
+                <RadyoNewsInterface />
             ) : currentView === 'chat' ? (
                 <ChatInterface />
             ) : null}
@@ -71,6 +73,13 @@ function Dashboard({ onViewChange }) {
             name: 'MBR Künye Web',
             description: 'Web linkleri üzerinden künye sayfalarını analiz eder (OCR kullanmadan).',
             icon: <Globe size={32} color="#14b8a6" />,
+            status: 'Yeni'
+        },
+        {
+            id: 'radyo',
+            name: 'Radyo News Analyzer',
+            description: 'Radyo kayıtlarından otomatik haber segmentlerini tespit eder ve metne dönüştürür.',
+            icon: <Radio size={32} color="#8b5cf6" />,
             status: 'Yeni'
         },
         {
@@ -1976,6 +1985,356 @@ function KunyeWebInterface() {
                 </div>
             </div >
         </div >
+    )
+}
+
+function RadyoNewsInterface() {
+    const [audioFile, setAudioFile] = useState(null)
+    const [apiKey, setApiKey] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [progress, setProgress] = useState(null)
+    const [result, setResult] = useState(null)
+    const [error, setError] = useState(null)
+    const fileInputRef = useRef(null)
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60)
+        const secs = Math.floor(seconds % 60)
+        return `${mins}:${secs.toString().padStart(2, '0')}`
+    }
+
+    const formatDuration = (seconds) => {
+        const mins = Math.floor(seconds / 60)
+        const hrs = Math.floor(mins / 60)
+        const remainMins = mins % 60
+
+        if (hrs > 0) {
+            return `${hrs}s ${remainMins}dk`
+        }
+        return `${mins}dk`
+    }
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0]
+        if (file && (file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|m4a|mpg|ogg|flac)$/i))) {
+            setAudioFile(file)
+            setResult(null)
+            setError(null)
+            setProgress(null)
+        } else {
+            setError('Lütfen geçerli bir ses dosyası seçin (MP3, WAV, M4A, MPG, vb.)')
+        }
+    }
+
+    const handleProcess = async () => {
+        if (!audioFile || !apiKey) return
+
+        setLoading(true)
+        setError(null)
+        setResult(null)
+        setProgress(null)
+
+        const formData = new FormData()
+        formData.append('file', audioFile)
+        formData.append('openai_api_key', apiKey)
+
+        try {
+            const response = await fetch('/api/v1/pipelines/radyo-news-stream', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                throw new Error(`Server hatası: ${response.status}`)
+            }
+
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                const chunk = decoder.decode(value)
+                const lines = chunk.split('\n')
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6))
+
+                            if (data.type === 'init') {
+                                setProgress({ message: data.message, step: 'init' })
+                            } else if (data.type === 'progress') {
+                                setProgress(data)
+                            } else if (data.type === 'news_found') {
+                                setProgress({ ...data, isNews: true })
+                            } else if (data.type === 'complete') {
+                                setResult(data.result)
+                                setProgress(null)
+                                setLoading(false)
+                            } else if (data.type === 'error') {
+                                setError(data.message)
+                                setLoading(false)
+                            }
+                        } catch (e) {
+                            console.error('Parse error:', e)
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error:', err)
+            setError(err.message)
+            setLoading(false)
+        }
+    }
+
+    const exportJSON = () => {
+        if (!result) return
+
+        const dataStr = JSON.stringify(result, null, 2)
+        const dataBlob = new Blob([dataStr], { type: 'application/json' })
+        const url = URL.createObjectURL(dataBlob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `radyo_news_${new Date().toISOString().split('T')[0]}.json`
+        link.click()
+        URL.revokeObjectURL(url)
+    }
+
+    return (
+        <div className="animate-fade-in" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '0.75rem', borderRadius: '0.75rem' }}>
+                    <Radio size={32} color="#8b5cf6" />
+                </div>
+                <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>Radyo News Analyzer</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>Radyo kayıtlarından otomatik haber segmentlerini tespit eder</p>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                <div>
+                    <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600, color: '#8b5cf6' }}>
+                            OpenAI API Key *
+                        </label>
+                        <input
+                            type="password"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            placeholder="sk-proj-..."
+                            style={{
+                                width: '100%',
+                                padding: '0.75rem',
+                                background: 'var(--bg-color)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '0.5rem',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                    </div>
+
+                    <div
+                        className="glass-panel"
+                        style={{
+                            padding: '2rem',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            marginBottom: '1.5rem',
+                            border: audioFile ? '2px solid #10b981' : '2px dashed var(--border-color)'
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="audio/*,.mp3,.wav,.m4a,.mpg,.ogg,.flac"
+                            style={{ display: 'none' }}
+                        />
+
+                        {audioFile ? (
+                            <>
+                                <Radio size={48} color="#10b981" style={{ margin: '0 auto 1rem' }} />
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>{audioFile.name}</h3>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                    Boyut: {(audioFile.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <Upload size={48} color="#8b5cf6" style={{ margin: '0 auto 1rem' }} />
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Ses Dosyası Yükle</h3>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                    MP3, WAV, M4A, MPG formatları desteklenir
+                                </p>
+                            </>
+                        )}
+                    </div>
+
+                    <button
+                        className="btn btn-primary"
+                        style={{ width: '100%', background: '#8b5cf6', borderColor: '#8b5cf6' }}
+                        disabled={!audioFile || !apiKey || loading}
+                        onClick={handleProcess}
+                    >
+                        {loading ? <><Loader2 className="loading-spinner" size={20} /> Analiz Ediliyor...</> : <><Radio size={18} /> Analiz Et</>}
+                    </button>
+
+                    {result && (
+                        <button
+                            className="btn btn-secondary"
+                            style={{ width: '100%', marginTop: '1rem', background: '#10b981', color: 'white' }}
+                            onClick={exportJSON}
+                        >
+                            <FileText size={18} /> JSON İndir
+                        </button>
+                    )}
+                </div>
+
+                <div className="glass-panel" style={{ padding: '2rem', maxHeight: '800px', overflowY: 'auto' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>Sonuçlar</h3>
+
+                    {loading && progress && (
+                        <div style={{ padding: '2rem' }}>
+                            <div style={{
+                                padding: '1.5rem',
+                                background: 'rgba(139, 92, 246, 0.05)',
+                                borderRadius: '0.75rem',
+                                border: '1px solid rgba(139, 92, 246, 0.2)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                                    <Loader2 className="loading-spinner" size={24} color="#8b5cf6" />
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#8b5cf6' }}>
+                                        {progress.step === 'conversion' && '🔄 Dönüştürülüyor'}
+                                        {progress.step === 'segmentation' && '✂️ Segmentlere Ayrılıyor'}
+                                        {progress.step === 'merging' && '🔗 Birleştiriliyor'}
+                                        {progress.step === 'merged' && '✓ Hazır'}
+                                        {progress.step === 'transcription' && `🎤 Transkripsiyon (${progress.segment}/${progress.total})`}
+                                        {progress.step === 'analysis' && `🤖 Analiz (${progress.segment}/${progress.total})`}
+                                        {progress.isNews && '📰 Haber Bulundu!'}
+                                    </span>
+                                </div>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
+                                    {progress.message}
+                                </p>
+                                {progress.title && (
+                                    <p style={{ color: '#8b5cf6', fontWeight: 600, marginTop: '0.5rem' }}>
+                                        {progress.title}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div style={{
+                            color: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '1rem',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            borderRadius: '0.5rem'
+                        }}>
+                            <AlertCircle size={20} />
+                            {error}
+                        </div>
+                    )}
+
+                    {result && !loading && (
+                        <div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+                                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#8b5cf6' }}>
+                                        {formatDuration(result.total_duration)}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Toplam Süre</div>
+                                </div>
+                                <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#10b981' }}>{result.news_count}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Haber Sayısı</div>
+                                </div>
+                                <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' }}>{result.total_segments}</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Segment</div>
+                                </div>
+                            </div>
+
+                            <div style={{ background: 'var(--surface-color)', padding: '1rem', borderRadius: '0.75rem', marginBottom: '2rem' }}>
+                                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>Segment Dağılımı:</h4>
+                                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+                                    <span>🎙️ Konuşma: <strong>{result.speech_segments}</strong></span>
+                                    <span>🎵 Müzik: <strong>{result.music_segments}</strong></span>
+                                    <span>🔇 Gürültü: <strong>{result.noise_segments}</strong></span>
+                                </div>
+                            </div>
+
+                            {result.news_items && result.news_items.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    {result.news_items.map((news, idx) => (
+                                        <div key={idx} style={{
+                                            background: 'rgba(16, 185, 129, 0.05)',
+                                            borderRadius: '0.75rem',
+                                            padding: '1.5rem',
+                                            border: '1px solid rgba(16, 185, 129, 0.2)'
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem' }}>
+                                                <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#10b981', margin: 0 }}>
+                                                    {news.baslik || `Haber ${idx + 1}`}
+                                                </h4>
+                                                <span style={{
+                                                    padding: '0.25rem 0.75rem',
+                                                    borderRadius: '1rem',
+                                                    background: '#8b5cf6',
+                                                    color: 'white',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {formatTime(news.start_time)} - {formatTime(news.end_time)}
+                                                </span>
+                                            </div>
+
+                                            {news.ozet && (
+                                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.75rem', fontStyle: 'italic' }}>
+                                                    {news.ozet}
+                                                </p>
+                                            )}
+
+                                            <p style={{ lineHeight: '1.6', fontSize: '0.95rem', marginBottom: '1rem' }}>
+                                                {news.tam_metin}
+                                            </p>
+
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                                {news.tarih && <span style={{ color: 'var(--text-secondary)' }}>📅 {news.tarih}</span>}
+                                                {news.kisiler && news.kisiler.length > 0 && <span style={{ color: 'var(--text-secondary)' }}>👤 {news.kisiler.join(', ')}</span>}
+                                                {news.konular && news.konular.length > 0 && <span style={{ color: 'var(--text-secondary)' }}>🏷️ {news.konular.join(', ')}</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                                    <AlertCircle size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                                    <p>Hiç haber segmenti bulunamadı</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {!loading && !result && !error && (
+                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
+                            <Radio size={48} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
+                            <p>Ses dosyası yükleyin ve analizi başlatın</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     )
 }
 

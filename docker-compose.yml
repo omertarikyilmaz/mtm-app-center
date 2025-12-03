@@ -102,3 +102,23 @@ services:
       - deepseek-ocr-api
       - iflas-pipeline-api
     restart: unless-stopped
+
+  # Radyo News Pipeline - API Service (OpenAI + Audio Segmentation)
+  radyo-news-pipeline:
+    build:
+      context: ./pipelines/openai-radyo-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8008:8008"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - /tmp/audio:/tmp/audio
+    restart: unless-stopped
