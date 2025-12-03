@@ -121,11 +121,18 @@ async def transcribe_audio(audio_path: Path, api_key: str) -> str:
             # Extract chunk
             chunk = audio[start_ms:end_ms]
             
-            # Save chunk to temp file
-            chunk_path = audio_path.parent / f"chunk_{i}_{audio_path.name}"
-            chunk.export(str(chunk_path), format="mp3")
+            # Save chunk to temp file (use simple ASCII filename to avoid encoding issues)
+            chunk_filename = f"chunk_{i}_{id(audio_path)}.mp3"
+            chunk_path = audio_path.parent / chunk_filename
             
             try:
+                # Export with explicit format (no codec parameter to avoid encoding issues)
+                chunk.export(
+                    str(chunk_path),
+                    format="mp3",
+                    bitrate="128k"
+                )
+                
                 # Transcribe chunk
                 with open(chunk_path, 'rb') as chunk_file:
                     chunk_transcript = client.audio.transcriptions.create(
@@ -150,7 +157,9 @@ async def transcribe_audio(audio_path: Path, api_key: str) -> str:
         return full_transcript
         
     except Exception as e:
+        import traceback
         print(f"[ERROR] Transcription failed: {e}")
+        print(f"[ERROR] Traceback: {traceback.format_exc()}")
         raise
 
 def create_news_extraction_prompt() -> str:
