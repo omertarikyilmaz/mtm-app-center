@@ -28,6 +28,7 @@ class NewsItem(BaseModel):
     kisiler: Optional[List[str]] = None
     kurumlar: Optional[List[str]] = None
     yerler: Optional[List[str]] = None
+    ozel_isimler: Optional[List[str]] = None  # Tüm özel isimler (proper nouns)
 
 class RadioAnalysisResult(BaseModel):
     """Complete analysis result"""
@@ -181,7 +182,7 @@ karışık halde bulunuyor.
 
 ## 📋 ÇIKTI FORMATI:
 
-Her haber için şu bilgileri çıkar:
+Every haber için şu bilgileri çıkar:
 
 ```json
 {
@@ -190,11 +191,22 @@ Her haber için şu bilgileri çıkar:
   "ozet": "2-3 cümlelik özet. Ana olay ve sonucu içermeli.",
   "tam_metin": "Haberin transkriptteki tam metni (aynen)",
   "tarih": "Metinde geçiyorsa tarih/saat bilgisi (örn: '3 Aralık 2024', '15:30')",
-  "kisiler": ["Metinde geçen kişi isimleri"],
-  "kurumlar": ["Bahsedilen kurum/kuruluşlar"],
-  "yerler": ["Bahsedilen şehir/ülke isimleri"]
+  "kisiler": ["Metinde geçen kişi isimleri (politikacı, spor cu, bilim insanı, vb)"],
+  "kurumlar": ["Bahsedilen kurum/kuruluşlar (bakanlık, şirket, parti, vb)"],
+  "yerler": ["Bahsedilen şehir/ülke/bölge isimleri"],
+  "ozel_isimler": ["BÜTÜN özel isimler - kişi, kurum, yer, marka, ürün, etkinlik, proje adları - Büyük harfle başlayan TÜM isimler"]
 }
 ```
+
+**ÖZEL İSİMLER (ozel_isimler) KURALI:**
+- Metinde geçen TÜM proper noun'ları (özel isimleri) çıkar
+- Kişi adları: "Recep Tayyip Erdoğan", "Lionel Messi"
+- Kurum/Şirket: "Türkiye Cumhuriyeti", "Apple", "NATO"
+- Yerler: "İstanbul", "Avrupa Birliği", "Boğaziçi Köprüsü"
+- Marka/Ürün: "iPhone 15", "Tesla Model 3"
+- Etkinlik/Proje: "Dünya Kupası", "Kanal İstanbul"
+- Yasanışlarına göre büyük harfle yazılan HER ŞEY
+- Tekrar olabilir, sorun değil - hepsini listele
 
 ---
 
@@ -218,6 +230,7 @@ Her haber için şu bilgileri çıkar:
    - Başlık: Kısa ve açıklayıcı
    - Özet: Sadece önemli bilgiler
    - Tam metin: Transkriptteki ilgili kısmın tamamı
+   - Özel isimler: Eksik bırakma, hepsini al
 
 5. **BOŞLUK OLMASIN:**
    - Hiç haber yoksa bile boş array dön: `{"news_items": []}`
@@ -238,7 +251,8 @@ Her haber için şu bilgileri çıkar:
       "tarih": "string veya null",
       "kisiler": ["string"] veya null,
       "kurumlar": ["string"] veya null,
-      "yerler": ["string"] veya null
+      "yerler": ["string"] veya null,
+      "ozel_isimler": ["string"] veya null
     }
   ]
 }
