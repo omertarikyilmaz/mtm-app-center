@@ -205,11 +205,18 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                         break
                 
                 if gno_col_idx:
+                    # Helper to normalize GNO - remove .0 suffix from floats
+                    def normalize_gno(val):
+                        s = str(val)
+                        if s.endswith('.0'):
+                            s = s[:-2]
+                        return s
+                    
                     # Extract hyperlinks from GNO column
                     for row_idx, row in enumerate(ws.iter_rows(min_row=2, min_col=gno_col_idx, max_col=gno_col_idx), 2):
                         cell = row[0]
                         if cell.value and cell.hyperlink:
-                            gno_value = str(cell.value)
+                            gno_value = normalize_gno(cell.value)
                             hyperlink_url = cell.hyperlink.target
                             gno_to_url[gno_value] = hyperlink_url
                             logger.info(f"Found hyperlink for GNO {gno_value}: {hyperlink_url}")
@@ -246,7 +253,11 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                 gno_val = row[gno_column]
                 grupid_val = row[grupid_column]
                 if pd.notna(gno_val) and pd.notna(grupid_val):
-                    gno_to_grupid[str(gno_val)] = grupid_val
+                    # Normalize GNO
+                    gno_key = str(gno_val)
+                    if gno_key.endswith('.0'):
+                        gno_key = gno_key[:-2]
+                    gno_to_grupid[gno_key] = grupid_val
             logger.info(f"Built GNO to GrupId mapping with {len(gno_to_grupid)} entries")
         
         # Process each GNO with GrupId caching
@@ -259,7 +270,10 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                     TASKS[task_id]["progress"] = idx
                     TASKS[task_id]["message"] = f"Processing GNO {idx + 1}/{total_gnos}: {gno}"
                     
+                    # Normalize GNO - remove .0 suffix from floats
                     gno_str = str(gno)
+                    if gno_str.endswith('.0'):
+                        gno_str = gno_str[:-2]
                     
                     # Check if this GNO's GrupId was already processed
                     grupid = gno_to_grupid.get(gno_str)
