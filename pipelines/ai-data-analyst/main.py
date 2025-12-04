@@ -173,7 +173,7 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
         
         # Read Excel/CSV
         if input_file.suffix == '.csv':
-            df = pd.read_csv(input_file)
+            df = pd.read_excel(input_file)
         else:
             df = pd.read_excel(input_file)
         
@@ -188,6 +188,35 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
         
         if gno_column is None:
             raise ValueError("Could not find 'Gno' or 'GNO' column in file")
+        
+        # Extract hyperlinks from Excel cells using openpyxl
+        gno_to_url = {}
+        if input_file.suffix in ['.xlsx', '.xls']:
+            try:
+                from openpyxl import load_workbook
+                wb = load_workbook(input_file)
+                ws = wb.active
+                
+                # Find GNO column index
+                gno_col_idx = None
+                for idx, cell in enumerate(ws[1], 1):  # Header row
+                    if cell.value and str(cell.value).lower() in ['gno', 'GNO']:
+                        gno_col_idx = idx
+                        break
+                
+                if gno_col_idx:
+                    # Extract hyperlinks from GNO column
+                    for row_idx, row in enumerate(ws.iter_rows(min_row=2, min_col=gno_col_idx, max_col=gno_col_idx), 2):
+                        cell = row[0]
+                        if cell.value and cell.hyperlink:
+                            gno_value = str(cell.value)
+                            hyperlink_url = cell.hyperlink.target
+                            gno_to_url[gno_value] = hyperlink_url
+                            logger.info(f"Found hyperlink for GNO {gno_value}: {hyperlink_url}")
+                
+                logger.info(f"Extracted {len(gno_to_url)} hyperlinks from Excel")
+            except Exception as e:
+                logger.warning(f"Could not extract hyperlinks: {str(e)}")
         
         # Get unique GNOs
         unique_gnos = df[gno_column].dropna().unique()
@@ -209,8 +238,15 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                     
                     logger.info(f"Processing GNO {idx + 1}/{total_gnos}: {gno}")
                     
+                    # Use hyperlink if available, otherwise use GNO value directly
+                    gno_str = str(gno)
+                    gno_url = gno_to_url.get(gno_str, gno_str)
+                    
+                    if gno_url != gno_str:
+                        logger.info(f"Using hyperlink URL: {gno_url}")
+                    
                     # Process GNO
-                    results = await analyzer.process_gno(gno=str(gno), gno_url=str(gno))
+                    results = await analyzer.process_gno(gno=gno_str, gno_url=gno_url)
                     all_results.extend(results)
                     
                 except Exception as e:

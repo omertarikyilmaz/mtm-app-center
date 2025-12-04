@@ -52,12 +52,12 @@ class NewsAnalyzer:
             Extracted news text or None if failed
         """
         try:
-            # If it's already a full URL, use it. Otherwise construct medyatakip URL
+            # Construct medyatakip.com clip URL from GNO (same as künye pipeline)
             if gno_url.startswith('http'):
                 url = gno_url
             else:
-                # Construct medyatakip.com URL from GNO
-                url = f"https://www.medyatakip.com/haber/detay/{gno_url}"
+                # Use the same URL format as künye pipeline
+                url = f"https://imgsrv.medyatakip.com/store/clip?gno={gno_url}"
             
             logger.info(f"Extracting news from: {url}")
             
