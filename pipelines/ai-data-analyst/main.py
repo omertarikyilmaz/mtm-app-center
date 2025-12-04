@@ -218,6 +218,18 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
             except Exception as e:
                 logger.warning(f"Could not extract hyperlinks: {str(e)}")
         
+        # Find GrupId column (case-insensitive)
+        grupid_column = None
+        for col in df.columns:
+            if col.lower() == 'grupid':
+                grupid_column = col
+                break
+        
+        if grupid_column:
+            logger.info(f"Found GrupId column: {grupid_column}")
+        else:
+            logger.info("No GrupId column found, processing all GNOs individually")
+        
         # Get unique GNOs
         unique_gnos = df[gno_column].dropna().unique()
         total_gnos = len(unique_gnos)
@@ -227,8 +239,19 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
         
         logger.info(f"Found {total_gnos} unique GNOs")
         
-        # Process each GNO
+        # Build GNO to GrupId mapping if GrupId column exists
+        gno_to_grupid = {}
+        if grupid_column:
+            for _, row in df.iterrows():
+                gno_val = row[gno_column]
+                grupid_val = row[grupid_column]
+                if pd.notna(gno_val) and pd.notna(grupid_val):
+                    gno_to_grupid[str(gno_val)] = grupid_val
+            logger.info(f"Built GNO to GrupId mapping with {len(gno_to_grupid)} entries")
+        
+        # Process each GNO with GrupId caching
         all_results = []
+        grupid_results_cache = {}  # Cache: GrupId -> analysis results
         
         async with NewsAnalyzer(api_key=api_key, model=model) as analyzer:
             for idx, gno in enumerate(unique_gnos):
@@ -236,10 +259,26 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                     TASKS[task_id]["progress"] = idx
                     TASKS[task_id]["message"] = f"Processing GNO {idx + 1}/{total_gnos}: {gno}"
                     
+                    gno_str = str(gno)
+                    
+                    # Check if this GNO's GrupId was already processed
+                    grupid = gno_to_grupid.get(gno_str)
+                    
+                    if grupid and grupid in grupid_results_cache:
+                        # Reuse cached results for same GrupId
+                        cached_results = grupid_results_cache[grupid]
+                        logger.info(f"GNO {idx + 1}/{total_gnos}: {gno} - Using cached results from GrupId {grupid}")
+                        
+                        # Copy results with current GNO
+                        for cached_result in cached_results:
+                            result_copy = cached_result.copy()
+                            result_copy["gno"] = gno_str
+                            all_results.append(result_copy)
+                        continue
+                    
                     logger.info(f"Processing GNO {idx + 1}/{total_gnos}: {gno}")
                     
                     # Use hyperlink if available, otherwise use GNO value directly
-                    gno_str = str(gno)
                     gno_url = gno_to_url.get(gno_str, gno_str)
                     
                     if gno_url != gno_str:
@@ -248,6 +287,11 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                     # Process GNO
                     results = await analyzer.process_gno(gno=gno_str, gno_url=gno_url)
                     all_results.extend(results)
+                    
+                    # Cache results by GrupId
+                    if grupid:
+                        grupid_results_cache[grupid] = results
+                        logger.info(f"Cached results for GrupId {grupid}")
                     
                 except Exception as e:
                     logger.error(f"Error processing GNO {gno}: {str(e)}")

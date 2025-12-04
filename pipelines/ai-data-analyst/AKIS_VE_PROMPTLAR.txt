@@ -3,12 +3,18 @@
 ## AKIŞ ŞEMASI
 
 1. Kullanıcı GNO/Gno kolonlu Excel/CSV dosyası yükler
-2. Her benzersiz GNO için:
-   a. GNO hücresindeki hyperlink URL'sine git
-   b. Sayfadan haber metnini çıkar (text-wrapper div veya Metin butonu)
-   c. PROMPT 1 ile OpenAI API'ye gönder → Marka listesi al
-   d. Her marka için PROMPT 2 ile sentiment analizi yap
-3. Tüm sonuçları Excel dosyasına kaydet
+2. Sistem GrupId kolonunu arar (varsa optimizasyon için kullanılır)
+3. Her benzersiz GNO için:
+   a. GrupId kontrolü: Aynı GrupId daha önce işlendiyse, sonuçları kopyala (API çağrısı yapma)
+   b. GNO hücresindeki hyperlink URL'sine git
+   c. Sayfadan haber metnini çıkar (text-wrapper div veya Metin butonu)
+   d. PROMPT 1 ile OpenAI API'ye gönder → Marka listesi al
+   e. Her marka için PROMPT 2 ile sentiment analizi yap
+   f. Sonuçları GrupId cache'ine kaydet
+4. Tüm sonuçları Excel dosyasına kaydet
+
+**NOT:** GrupId optimizasyonu ile aynı haber içeriğine sahip farklı kaynaklardaki haberler için 
+tekrar API çağrısı yapılmaz, bu da hem maliyet hem de süre tasarrufu sağlar.
 
 ## ÇIKTI FORMATI
 
