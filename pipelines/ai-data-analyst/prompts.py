@@ -56,15 +56,15 @@ Haberin içeriğine göre aşağıdaki 6 kategoriden en uygun olanını seç. E�
 ZORUNLU: Yanıtın mutlaka "brands" anahtarı içeren bir JSON objesi olmalıdır.
 
 ```json
-{
+{{
   "brands": [
-    {
+    {{
       "brand": "String (Marka Adı - Title Case)",
       "headline": "String (Max 7 kelime - Noktalama yok)",
       "category": "String (Enum: B2B, CORP, PROD, SERV, EVENT, CSR)"
-    }
+    }}
   ]
-}
+}}
 ```
 
 # ANALİZ EDİLECEK METİN:
@@ -104,10 +104,10 @@ Haberin anlatısı (narrative) **Hedef Marka**nın kontrolünde mi?
 Çıktıyı sadece aşağıdaki JSON objesi olarak ver. (Array veya Brand key kullanma).
 
 ```json
-{
+{{
   "sentiment": "String (Enum: Olumlu, Olumsuz, Nötr)",
   "mention_weight": "String (Enum: Yüksek Bahis, Dengeli Bahis, Kısa Bahis)",
   "control": "String (Enum: Kontrollü, Kontrolsüz)"
-}
+}}
 ```
 """
