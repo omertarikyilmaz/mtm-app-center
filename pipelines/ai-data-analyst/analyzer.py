@@ -179,11 +179,6 @@ class NewsAnalyzer:
         for attempt in range(MAX_RETRIES):
             try:
                 logger.info(f"[BRANDS] Attempt {attempt + 1}/{MAX_RETRIES}")
-                
-                try:
-                    response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=[
                             {
                                 "role": "system",
                                 "content": "Sen bir veri analisti uzmanısın. Yanıtların sadece geçerli JSON içermelidir."
