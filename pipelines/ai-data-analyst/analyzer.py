@@ -162,135 +162,6 @@ class NewsAnalyzer:
         except Exception as e:
             logger.error(f"[EXTRACT] ✗ Fatal error: {str(e)}")
             return None
-
-        """
-        Extract news text from GNO URL using Playwright
-        
-        Args:
-            gno_url: GNO identifier (will be converted to medyatakip.com URL)
-            
-        Returns:
-            Extracted news text or None if failed
-        """
-        try:
-            # Construct medyatakip.com clip URL from GNO (same as künye pipeline)
-            if gno_url.startswith('http'):
-                url = gno_url
-            else:
-                # Use the same URL format as künye pipeline
-                url = f"https://imgsrv.medyatakip.com/store/clip?gno={gno_url}"
-            
-            logger.info(f"Extracting news from: {url}")
-            
-            # Use Playwright for JavaScript rendering
-            from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-            
-            async with async_playwright() as p:
-                # Launch browser in headless mode
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-setuid-sandbox']
-                )
-                
-                # Create new page with realistic user agent
-                page = await browser.new_page(
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                )
-                
-                try:
-                    # Navigate to page with timeout
-                    await page.goto(url, wait_until='networkidle', timeout=TIMEOUT * 1000)
-                    
-                    # Wait for content to load
-                    await page.wait_for_timeout(2000)
-                    
-                    # Look for "Metin" button and click it to reveal text
-                    try:
-                        # Try to find and click the Metin button
-                        metin_button = await page.query_selector('button:has-text("Metin"), a:has-text("Metin")')
-                        if metin_button:
-                            logger.info("Found Metin button, clicking...")
-                            await metin_button.click()
-                            # Wait for text to load
-                            await page.wait_for_timeout(2000)
-                            logger.info("Clicked Metin button successfully")
-                    except Exception as e:
-                        logger.warning(f"Could not click Metin button: {str(e)}")
-                    
-                    # Get page content
-                    html_content = await page.content()
-                    
-                    # Parse with BeautifulSoup
-                    soup = BeautifulSoup(html_content, 'lxml')
-                    
-                    # Remove script and style elements
-                    for script in soup(["script", "style", "noscript"]):
-                        script.decompose()
-                    
-                    # Strategy 1: Look for "text-wrapper" (medyatakip.com uses this)
-                    text_wrapper = soup.find('div', class_='text-wrapper')
-                    if text_wrapper:
-                        text = text_wrapper.get_text(strip=True, separator=' ')
-                        await browser.close()
-                        logger.info(f"Extracted {len(text)} characters from text-wrapper")
-                        return text
-                    
-                    # Strategy 2: Look for article tag
-                    article = soup.find('article')
-                    if article:
-                        text = article.get_text(strip=True, separator=' ')
-                        await browser.close()
-                        logger.info(f"Extracted {len(text)} characters from article")
-                        return text
-                    
-                    # Strategy 3: Look for common content containers
-                    content_selectors = [
-                        ('div', {'class': 'article-content'}),
-                        ('div', {'class': 'news-content'}),
-                        ('div', {'class': 'content'}),
-                        ('div', {'id': 'article-body'}),
-                        ('div', {'class': 'story-body'}),
-                    ]
-                    
-                    for tag, attrs in content_selectors:
-                        element = soup.find(tag, attrs)
-                        if element:
-                            text = element.get_text(strip=True, separator=' ')
-                            if len(text) > 100:  # Minimum text length
-                                await browser.close()
-                                logger.info(f"Extracted {len(text)} characters from {tag}")
-                                return text
-                    
-                    # Strategy 4: Get all text from body
-                    body = soup.find('body')
-                    if body:
-                        text = body.get_text(separator='\\n', strip=True)
-                        # Clean up multiple newlines
-                        lines = [line.strip() for line in text.splitlines() if line.strip()]
-                        clean_text = ' '.join(lines)
-                        
-                        await browser.close()
-                        
-                        if len(clean_text) > 200:
-                            logger.info(f"Extracted {len(clean_text)} characters from body")
-                            return clean_text
-                    
-                    await browser.close()
-                    logger.warning(f"Could not find sufficient text in {url}")
-                    return None
-                    
-                except PlaywrightTimeoutError:
-                    logger.error(f"Timeout while loading {url}")
-                    await browser.close()
-                    return None
-                except Exception as e:
-                    logger.error(f"Error during page interaction: {str(e)}")
-                    await browser.close()
-                    return None
-                    
-        except Exception as e:
-            logger.error(f"Error extracting news from {gno_url}: {str(e)}")
-            return None
     
     async def analyze_brands(self, news_text: str) -> List[Dict]:
         """
@@ -304,7 +175,7 @@ class NewsAnalyzer:
         """
         for attempt in range(MAX_RETRIES):
             try:
-                logger.info(f"Analyzing brands (attempt {attempt + 1}/{MAX_RETRIES})")
+                logger.info(f"[BRANDS] Attempt {attempt + 1}/{MAX_RETRIES}")
                 
                 response = self.client.chat.completions.create(
                     model=self.model,
@@ -324,20 +195,43 @@ class NewsAnalyzer:
                 )
                 
                 content = response.choices[0].message.content.strip()
+                logger.info(f"[BRANDS] Response: {content[:200]}...")
                 
                 # Try to parse as JSON
                 try:
                     result = json.loads(content)
-                    # If result is a dict with array inside, extract it
-                    if isinstance(result, dict):
-                        for key in result:
-                            if isinstance(result[key], list):
-                                return result[key]
-                    # If result is already an array
+                    
+                    # Handle various response structures
                     if isinstance(result, list):
-                        return result
-                    logger.warning(f"Unexpected JSON structure: {result}")
-                    return []
+                        brands = result
+                    elif isinstance(result, dict):
+                        # Try to find array inside dict
+                        if 'brands' in result:
+                            brands = result['brands']
+                        elif 'markalar' in result:
+                            brands = result['markalar']
+                        else:
+                            # Get first list value
+                            for key, value in result.items():
+                                if isinstance(value, list):
+                                    brands = value
+                                    break
+                            else:
+                                logger.warning(f"[BRANDS] Unexpected dict: {list(result.keys())}")
+                                brands = []
+                    else:
+                        logger.warning(f"[BRANDS] Unexpected type: {type(result)}")
+                        brands = []
+                    
+                    if brands:
+                        logger.info(f"[BRANDS] ✓ Found {len(brands)} brand(s)")
+                        return brands
+                    else:
+                        logger.warning("[BRANDS] Empty result")
+                        if attempt < MAX_RETRIES - 1:
+                            await asyncio.sleep(1)
+                            continue
+                        return []
                 except json.JSONDecodeError:
                     # Try to extract JSON array from markdown code blocks
                     json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', content, re.DOTALL)
