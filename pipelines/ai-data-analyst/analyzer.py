@@ -66,7 +66,10 @@ class NewsAnalyzer:
             
             async with async_playwright() as p:
                 # Launch browser in headless mode
-                browser = await p.chromium.launch(headless=True)
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox']
+                )
                 
                 # Create new page with realistic user agent
                 page = await browser.new_page(
@@ -324,12 +327,15 @@ class NewsAnalyzer:
         """
         Process a single GNO: extract news and analyze
         
+        NOTE: One GNO can contain MULTIPLE brands in the news article.
+        This method will extract ALL brands and analyze sentiment for each.
+        
         Args:
             gno: GNO identifier
             gno_url: URL to news article
             
         Returns:
-            List of analysis results for all brands found
+            List of analysis results for all brands found in this single GNO
         """
         results = []
         
