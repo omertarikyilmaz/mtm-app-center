@@ -38,7 +38,7 @@ export default function AIDataAnalyst() {
         formData.append('model', model)
 
         try {
-            const response = await fetch('/api/v1/ai-analyst/analyze', {
+            const response = await fetch('/api/v1/pipelines/ai-data-analyst/analyze', {
                 method: 'POST',
                 body: formData,
             })
@@ -63,7 +63,7 @@ export default function AIDataAnalyst() {
     const pollStatus = async (id) => {
         const interval = setInterval(async () => {
             try {
-                const response = await fetch(`/api/v1/ai-analyst/status/${id}`)
+                const response = await fetch(`/api/v1/pipelines/ai-data-analyst/status/${id}`)
                 if (!response.ok) throw new Error('Status check failed')
 
                 const data = await response.json()
@@ -86,7 +86,7 @@ export default function AIDataAnalyst() {
         if (!taskId) return
 
         try {
-            const response = await fetch(`/api/v1/ai-analyst/download/${taskId}`)
+            const response = await fetch(`/api/v1/pipelines/ai-data-analyst/download/${taskId}`)
             if (!response.ok) throw new Error('Download failed')
 
             const blob = await response.blob()

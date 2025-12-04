@@ -43,7 +43,7 @@ async def health_check():
     return {"status": "healthy", "service": "ai-data-analyst"}
 
 
-@app.post("/api/v1/ai-analyst/analyze")
+@app.post("/api/v1/pipelines/ai-data-analyst/analyze")
 async def analyze_excel(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -107,7 +107,7 @@ async def analyze_excel(
     }
 
 
-@app.get("/api/v1/ai-analyst/status/{task_id}")
+@app.get("/api/v1/pipelines/ai-data-analyst/status/{task_id}")
 async def get_task_status(task_id: str):
     """
     Get status of analysis task
@@ -124,7 +124,7 @@ async def get_task_status(task_id: str):
     return TASKS[task_id]
 
 
-@app.get("/api/v1/ai-analyst/download/{task_id}")
+@app.get("/api/v1/pipelines/ai-data-analyst/download/{task_id}")
 async def download_result(task_id: str):
     """
     Download analysis result as Excel file
