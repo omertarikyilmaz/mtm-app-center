@@ -52,16 +52,19 @@ Haberin içeriğine göre aşağıdaki 6 kategoriden en uygun olanını seç. E�
     - *Örnek:* "İş Bankası'nın ormanlaştırma projesi başlatması."
 
 # JSON ŞEMASI (OUTPUT SCHEMA):
-Çıktı, aşağıda belirtilen yapı dışında hiçbir metin, açıklama veya markdown (```json` gibi) içermemelidir. Sadece ham (raw) JSON array ver.
+Çıktı, aşağıda belirtilen yapı dışında hiçbir metin, açıklama veya markdown içermemelidir.
+ZORUNLU: Yanıtın mutlaka "brands" anahtarı içeren bir JSON objesi olmalıdır.
 
 ```json
-[
-  {
-    "brand": "String (Marka Adı - Title Case)",
-    "headline": "String (Max 7 kelime - Noktalama yok)",
-    "category": "String (Enum: B2B, CORP, PROD, SERV, EVENT, CSR)"
-  }
-]
+{
+  "brands": [
+    {
+      "brand": "String (Marka Adı - Title Case)",
+      "headline": "String (Max 7 kelime - Noktalama yok)",
+      "category": "String (Enum: B2B, CORP, PROD, SERV, EVENT, CSR)"
+    }
+  ]
+}
 ```
 
 # ANALİZ EDİLECEK METİN:

@@ -173,7 +173,7 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
         
         # Read Excel/CSV
         if input_file.suffix == '.csv':
-            df = pd.read_excel(input_file)
+            df = pd.read_csv(input_file)
         else:
             df = pd.read_excel(input_file)
         
@@ -200,7 +200,7 @@ async def process_excel_task(task_id: str, input_file: Path, api_key: str, model
                 # Find GNO column index
                 gno_col_idx = None
                 for idx, cell in enumerate(ws[1], 1):  # Header row
-                    if cell.value and str(cell.value).lower() in ['gno', 'GNO']:
+                    if cell.value and str(cell.value).lower() == 'gno':
                         gno_col_idx = idx
                         break
                 

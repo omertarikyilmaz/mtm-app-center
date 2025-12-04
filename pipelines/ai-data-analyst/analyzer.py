@@ -208,21 +208,28 @@ class NewsAnalyzer:
                 
                 # Extract brands list
                 brands = []
-                if isinstance(result, list):
-                    brands = result
-                elif isinstance(result, dict):
-                    # Try common keys
-                    for key in ['brands', 'markalar', 'data', 'results']:
-                        if key in result and isinstance(result[key], list):
-                            brands = result[key]
-                            logger.info(f"[BRANDS] Found list at key '{key}'")
-                            break
-                    # Fallback: first list value
-                    if not brands:
-                        for value in result.values():
-                            if isinstance(value, list):
-                                brands = value
+                if isinstance(result, dict):
+                    # "brands" key is required by prompt
+                    if 'brands' in result and isinstance(result['brands'], list):
+                        brands = result['brands']
+                        logger.info(f"[BRANDS] Found list at key 'brands'")
+                    else:
+                        # Fallback: try other possible keys
+                        for key in ['markalar', 'data', 'results']:
+                            if key in result and isinstance(result[key], list):
+                                brands = result[key]
+                                logger.info(f"[BRANDS] Found list at key '{key}'")
                                 break
+                        # Last fallback: first list value
+                        if not brands:
+                            for value in result.values():
+                                if isinstance(value, list):
+                                    brands = value
+                                    logger.info(f"[BRANDS] Found list in result values")
+                                    break
+                elif isinstance(result, list):
+                    brands = result
+                    logger.info(f"[BRANDS] Result is a list directly")
                 
                 if brands:
                     logger.info(f"[BRANDS] ✓ SUCCESS: {len(brands)} brand(s) found")
