@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
-from openai import AsyncOpenAI
+import openai
 
 from prompts import BRAND_EXTRACTION_PROMPT, SENTIMENT_ANALYSIS_PROMPT
 
@@ -27,7 +27,7 @@ class NewsAnalyzer:
     """Handles news extraction and analysis"""
     
     def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.client = openai.OpenAI(api_key=api_key)
         self.model = model
         self.session = None
         
@@ -181,7 +181,7 @@ class NewsAnalyzer:
                 logger.info(f"[BRANDS] Attempt {attempt + 1}/{MAX_RETRIES}")
                 
                 try:
-                    response = await self.client.chat.completions.create(
+                    response = self.client.chat.completions.create(
                         model=self.model,
                         messages=[
                             {
@@ -289,7 +289,7 @@ class NewsAnalyzer:
             try:
                 logger.info(f"Analyzing sentiment for '{brand_name}' (attempt {attempt + 1}/{MAX_RETRIES})")
                 
-                response = await self.client.chat.completions.create(
+                response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {
