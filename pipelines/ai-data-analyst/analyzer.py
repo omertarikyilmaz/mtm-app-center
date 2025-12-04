@@ -43,6 +43,127 @@ class NewsAnalyzer:
     
     async def extract_news_text(self, gno_url: str) -> Optional[str]:
         """
+        Extract news text from GNO URL
+        
+        Strategy: Try simple requests first (fast), fallback to Playwright if needed
+        
+        Args:
+            gno_url: GNO identifier or URL
+            
+        Returns:
+            Extracted news text or None if failed
+        """
+        try:
+            # Construct URL
+            if gno_url.startswith('http'):
+                url = gno_url
+            else:
+                url = f"https://imgsrv.medyatakip.com/store/clip?gno={gno_url}"
+            
+            logger.info(f"[EXTRACT] Trying {url}")
+            
+            # STRATEGY 1: Try simple requests first (MUCH FASTER)
+            try:
+                logger.info("[EXTRACT] Attempting simple HTTP request...")
+                async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as response:
+                    if response.status == 200:
+                        html = await response.text()
+                        soup = BeautifulSoup(html, 'lxml')
+                        
+                        # Remove scripts
+                        for script in soup(["script", "style", "noscript"]):
+                            script.decompose()
+                        
+                        # Try text-wrapper
+                        text_wrapper = soup.find('div', class_='text-wrapper')
+                        if text_wrapper:
+                            text = text_wrapper.get_text(strip=True, separator=' ')
+                            if len(text) > 100:
+                                logger.info(f"[EXTRACT] ✓ Got {len(text)} chars via simple request")
+                                return text
+                        
+                        logger.info("[EXTRACT] Simple request succeeded but no text found, trying Playwright...")
+            except Exception as e:
+                logger.warning(f"[EXTRACT] Simple request failed: {str(e)}, trying Playwright...")
+            
+            # STRATEGY 2: Use Playwright (slower but handles JavaScript)
+            logger.info("[EXTRACT] Using Playwright...")
+            from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+            
+            try:
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(
+                        headless=True,
+                        args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                    )
+                    
+                    page = await browser.new_page(
+                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    )
+                    
+                    try:
+                        # Short timeout - fail fast
+                        await page.goto(url, wait_until='domcontentloaded', timeout=20000)
+                        await page.wait_for_timeout(1500)
+                        
+                        # Try Metin button
+                        try:
+                            metin_btn = await page.query_selector('button:has-text("Metin")')
+                            if metin_btn:
+                                await metin_btn.click()
+                                await page.wait_for_timeout(1500)
+                        except:
+                            pass
+                        
+                        # Get content
+                        html = await page.content()
+                        soup = BeautifulSoup(html, 'lxml')
+                        
+                        for script in soup(["script", "style", "noscript"]):
+                            script.decompose()
+                        
+                        # Try text-wrapper
+                        text_wrapper = soup.find('div', class_='text-wrapper')
+                        if text_wrapper:
+                            text = text_wrapper.get_text(strip=True, separator=' ')
+                            if len(text) > 100:
+                                await browser.close()
+                                logger.info(f"[EXTRACT] ✓ Got {len(text)} chars via Playwright")
+                                return text
+                        
+                        # Try body as last resort
+                        body = soup.find('body')
+                        if body:
+                            text = body.get_text(separator=' ', strip=True)
+                            lines = [l.strip() for l in text.split() if l.strip()]
+                            clean_text = ' '.join(lines)
+                            if len(clean_text) > 200:
+                                await browser.close()
+                                logger.info(f"[EXTRACT] ✓ Got {len(clean_text)} chars from body")
+                                return clean_text
+                        
+                        await browser.close()
+                        logger.error(f"[EXTRACT] ✗ No sufficient text found")
+                        return None
+                        
+                    except PlaywrightTimeoutError:
+                        await browser.close()
+                        logger.error(f"[EXTRACT] ✗ Playwright timeout after 20s")
+                        return None
+                    except Exception as e:
+                        await browser.close()
+                        logger.error(f"[EXTRACT] ✗ Playwright error: {str(e)}")
+                        return None
+                        
+            except Exception as e:
+                logger.error(f"[EXTRACT] ✗ Playwright init error: {str(e)}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"[EXTRACT] ✗ Fatal error: {str(e)}")
+            return None
+
+        """
         Extract news text from GNO URL using Playwright
         
         Args:
