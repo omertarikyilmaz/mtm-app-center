@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
-import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe, Radio } from 'lucide-react'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe, Radio, BarChart3 } from 'lucide-react'
 import './index.css'
+import AIDataAnalyst from './components/pages/AIDataAnalyst'
 
 function App() {
     const [currentView, setCurrentView] = useState('dashboard')
@@ -26,6 +27,8 @@ function App() {
                 <KunyeWebInterface />
             ) : currentView === 'radyo' ? (
                 <RadyoNewsInterface />
+            ) : currentView === 'ai-analyst' ? (
+                <AIDataAnalyst />
             ) : currentView === 'chat' ? (
                 <ChatInterface />
             ) : null}
@@ -80,6 +83,13 @@ function Dashboard({ onViewChange }) {
             name: 'Radyo News Analyzer',
             description: 'Radyo kayıtlarından otomatik haber segmentlerini tespit eder ve metne dönüştürür.',
             icon: <Radio size={32} color="#8b5cf6" />,
+            status: 'Yeni'
+        },
+        {
+            id: 'ai-analyst',
+            name: 'AI Data Analyst',
+            description: 'Haber linklerinden marka ve sentiment analizi yapar, Excel dosyası olarak döndürür.',
+            icon: <BarChart3 size={32} color="#10b981" />,
             status: 'Yeni'
         },
         {

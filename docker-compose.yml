@@ -116,3 +116,14 @@ services:
       - /tmp/audio:/tmp/audio
     restart: unless-stopped
 
+  # AI Data Analyst Pipeline - API Service (OpenAI GPT + Web Scraping)
+  ai-data-analyst:
+    build:
+      context: ./pipelines/ai-data-analyst
+      dockerfile: Dockerfile
+    ports:
+      - "8009:8009"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    restart: unless-stopped
+
