@@ -245,3 +245,147 @@ class NewsAnalyzer:
         
         logger.error(f"[BRANDS] FAILED after {MAX_RETRIES} attempts")
         return []
+    
+    async def analyze_sentiment(self, brand_name: str, news_text: str) -> Dict:
+        """
+        Analyze sentiment for a specific brand
+        
+        Args:
+            brand_name: Brand name to analyze
+            news_text: News article text
+            
+        Returns:
+            Sentiment analysis dictionary
+        """
+        for attempt in range(MAX_RETRIES):
+            try:
+                logger.info(f"Analyzing sentiment for '{brand_name}' (attempt {attempt + 1}/{MAX_RETRIES})")
+                
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Sen bir medya analisti uzmanısın. Yanıtların sadece geçerli JSON içermelidir."
+                        },
+                        {
+                            "role": "user",
+                            "content": SENTIMENT_ANALYSIS_PROMPT.format(
+                                brand_name=brand_name,
+                                news_text=news_text
+                            )
+                        }
+                    ],
+                    temperature=0.3,
+                    max_tokens=500,
+                    response_format={"type": "json_object"}
+                )
+                
+                content = response.choices[0].message.content.strip()
+                
+                # Parse JSON
+                try:
+                    result = json.loads(content)
+                    return result
+                except json.JSONDecodeError:
+                    # Try to extract JSON object from markdown code blocks
+                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group(1))
+                    
+                    # Try to find JSON object directly
+                    json_match = re.search(r'\{.*?\}', content, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group(0))
+                    
+                    logger.error(f"Could not parse JSON from response: {content}")
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(1)
+                        continue
+                    return {
+                        "sentiment": "Nötr",
+                        "mention_weight": "Kısa Bahis",
+                        "control": "Kontrolsüz"
+                    }
+                    
+            except Exception as e:
+                logger.error(f"Error analyzing sentiment: {str(e)}")
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(1)
+                    continue
+                return {
+                    "sentiment": "Nötr",
+                    "mention_weight": "Kısa Bahis",
+                    "control": "Kontrolsüz"
+                }
+        
+        # Default response if all retries failed
+        return {
+            "sentiment": "Nötr",
+            "mention_weight": "Kısa Bahis",
+            "control": "Kontrolsüz"
+        }
+    
+    async def process_gno(self, gno: str, gno_url: str) -> List[Dict]:
+        """
+        Process a single GNO: extract news and analyze
+        
+        NOTE: One GNO can contain MULTIPLE brands in the news article.
+        This method will extract ALL brands and analyze sentiment for each.
+        
+        Args:
+            gno: GNO identifier
+            gno_url: URL to news article
+            
+        Returns:
+            List of analysis results for all brands found in this single GNO
+        """
+        results = []
+        
+        # Extract news text
+        news_text = await self.extract_news_text(gno_url)
+        if not news_text:
+            return [{
+                "gno": gno,
+                "error": "Could not extract news text",
+                "brand": "",
+                "headline": "",
+                "category": "",
+                "sentiment": "",
+                "mention_weight": "",
+                "control": ""
+            }]
+        
+        # Analyze brands
+        brands = await self.analyze_brands(news_text)
+        if not brands:
+            return [{
+                "gno": gno,
+                "error": "No brands found",
+                "brand": "",
+                "headline": "",
+                "category": "",
+                "sentiment": "",
+                "mention_weight": "",
+                "control": ""
+            }]
+        
+        # Analyze sentiment for each brand
+        for brand_info in brands:
+            brand_name = brand_info.get('brand', '')
+            
+            sentiment_info = await self.analyze_sentiment(brand_name, news_text)
+            
+            result = {
+                "gno": gno,
+                "brand": brand_name,
+                "headline": brand_info.get('headline', ''),
+                "category": brand_info.get('category', ''),
+                "sentiment": sentiment_info.get('sentiment', ''),
+                "mention_weight": sentiment_info.get('mention_weight', ''),
+                "control": sentiment_info.get('control', ''),
+                "error": ""
+            }
+            results.append(result)
+        
+        return results

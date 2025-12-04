@@ -5,9 +5,8 @@ import json
 import re
 import asyncio
 import logging
-import time
-import traceback
 from typing import List, Dict, Optional
+from urllib.parse import urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -20,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-TIMEOUT = 60  # 60 seconds timeout per GNO 
+TIMEOUT = 60  # 60 seconds timeout per GNO as requested by user
 MAX_RETRIES = 3
 
 
@@ -166,7 +165,7 @@ class NewsAnalyzer:
     
     async def analyze_brands(self, news_text: str) -> List[Dict]:
         """
-        Analyze news text and extract brand information - SYNC OpenAI call
+        Analyze news text and extract brand information
         
         Args:
             news_text: News article text
@@ -174,76 +173,100 @@ class NewsAnalyzer:
         Returns:
             List of brand information dictionaries
         """
-        logger.info(f"[BRANDS] Starting analysis on {len(news_text)} characters")
-        logger.info(f"[BRANDS] Text sample: {news_text[:150]}...")
+        logger.info(f"[BRANDS] Starting analysis on {len(news_text)} characters of text")
+        logger.info(f"[BRANDS] Text sample: {news_text[:200]}...")
         
         for attempt in range(MAX_RETRIES):
             try:
                 logger.info(f"[BRANDS] Attempt {attempt + 1}/{MAX_RETRIES}")
-                
-                # SYNC OpenAI call (like ifl pipeline)
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "Sen bir veri analisti uzmanısın. Yanıtların sadece geçerli JSON içermelidir."
-                        },
-                        {
-                            "role": "user",
-                            "content": BRAND_EXTRACTION_PROMPT.format(news_text=news_text)
-                        }
-                    ],
-                    temperature=0.3,
-                    max_tokens=1500,
-                    response_format={"type": "json_object"}
-                )
-                
-                content = response.choices[0].message.content.strip()
-                logger.info(f"[BRANDS] OpenAI response:\n{content}\n")
-                
-                # Parse JSON
-                result = json.loads(content)
-                logger.info(f"[BRANDS] Parsed as: {type(result)}, keys: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
-                
-                # Extract brands list
-                brands = []
-                if isinstance(result, list):
-                    brands = result
-                elif isinstance(result, dict):
-                    # Try common keys
-                    for key in ['brands', 'markalar', 'data', 'results']:
-                        if key in result and isinstance(result[key], list):
-                            brands = result[key]
-                            logger.info(f"[BRANDS] Found list at key '{key}'")
-                            break
-                    # Fallback: first list value
-                    if not brands:
-                        for value in result.values():
-                            if isinstance(value, list):
-                                brands = value
-                                break
-                
-                if brands:
-                    logger.info(f"[BRANDS] ✓ SUCCESS: {len(brands)} brand(s) found")
-                    return brands
-                else:
-                    logger.warning(f"[BRANDS] Empty result on attempt {attempt + 1}")
-                    if attempt < MAX_RETRIES - 1:
-                        time.sleep(1)  # SYNC sleep
+                            {
+                                "role": "system",
+                                "content": "Sen bir veri analisti uzmanısın. Yanıtların sadece geçerli JSON içermelidir."
+                            },
+                            {
+                                "role": "user",
+                                "content": BRAND_EXTRACTION_PROMPT.format(news_text=news_text)
+                            }
+                        ],
+                        temperature=0.3,
+                        max_tokens=1500,
+                        response_format={"type": "json_object"}
+                    )
                     
-            except json.JSONDecodeError as e:
-                logger.error(f"[BRANDS] JSON error: {str(e)}")
-                logger.error(f"[BRANDS] Content: {content if 'content' in locals() else 'N/A'}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(1)
+                    content = response.choices[0].message.content.strip()
+                    logger.info(f"[BRANDS] Full OpenAI response:\n{content}")
+                    
+                except Exception as api_error:
+                    logger.error(f"[BRANDS] OpenAI API error: {type(api_error).__name__}: {str(api_error)}")
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(2)
+                        continue
+                    return []
+                
+                # Try to parse as JSON
+                try:
+                    result = json.loads(content)
+                    logger.info(f"[BRANDS] Parsed JSON type: {type(result)}")
+                    
+                    # Handle various response structures
+                    if isinstance(result, list):
+                        brands = result
+                        logger.info(f"[BRANDS] Direct list with {len(brands)} items")
+                    elif isinstance(result, dict):
+                        logger.info(f"[BRANDS] Dict with keys: {list(result.keys())}")
+                        # Try to find array inside dict
+                        if 'brands' in result:
+                            brands = result['brands']
+                            logger.info(f"[BRANDS] Found 'brands' key with {len(brands)} items")
+                        elif 'markalar' in result:
+                            brands = result['markalar']
+                            logger.info(f"[BRANDS] Found 'markalar' key with {len(brands)} items")
+                        else:
+                            # Get first list value
+                            for key, value in result.items():
+                                if isinstance(value, list):
+                                    brands = value
+                                    break
+                            else:
+                                logger.warning(f"[BRANDS] Unexpected dict: {list(result.keys())}")
+                                brands = []
+                    else:
+                        logger.warning(f"[BRANDS] Unexpected type: {type(result)}")
+                        brands = []
+                    
+                    if brands:
+                        logger.info(f"[BRANDS] ✓ Found {len(brands)} brand(s)")
+                        return brands
+                    else:
+                        logger.warning("[BRANDS] Empty result")
+                        if attempt < MAX_RETRIES - 1:
+                            await asyncio.sleep(1)
+                            continue
+                        return []
+                except json.JSONDecodeError:
+                    # Try to extract JSON array from markdown code blocks
+                    json_match = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', content, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group(1))
+                    
+                    # Try to find JSON array directly
+                    json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+                    if json_match:
+                        return json.loads(json_match.group(0))
+                    
+                    logger.error(f"Could not parse JSON from response: {content}")
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(1)
+                        continue
+                    return []
+                    
             except Exception as e:
-                logger.error(f"[BRANDS] Error: {type(e).__name__}: {str(e)}")
-                logger.error(f"[BRANDS] Traceback:\n{traceback.format_exc()}")
+                logger.error(f"Error analyzing brands: {str(e)}")
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(1)
+                    await asyncio.sleep(1)
+                    continue
+                return []
         
-        logger.error(f"[BRANDS] FAILED after {MAX_RETRIES} attempts")
         return []
     
     async def analyze_sentiment(self, brand_name: str, news_text: str) -> Dict:
