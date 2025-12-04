@@ -40,63 +40,117 @@ class NewsAnalyzer:
         if self.session:
             await self.session.close()
     
+    
     async def extract_news_text(self, gno_url: str) -> Optional[str]:
         """
-        Extract news text from GNO URL
+        Extract news text from GNO URL using Playwright
         
         Args:
-            gno_url: URL containing the news article
+            gno_url: GNO identifier (will be converted to medyatakip.com URL)
             
         Returns:
             Extracted news text or None if failed
         """
         try:
-            logger.info(f"Extracting news from: {gno_url}")
+            # If it's already a full URL, use it. Otherwise construct medyatakip URL
+            if gno_url.startswith('http'):
+                url = gno_url
+            else:
+                # Construct medyatakip.com URL from GNO
+                url = f"https://www.medyatakip.com/haber/detay/{gno_url}"
             
-            async with self.session.get(gno_url) as response:
-                if response.status != 200:
-                    logger.error(f"Failed to fetch {gno_url}: Status {response.status}")
-                    return None
+            logger.info(f"Extracting news from: {url}")
+            
+            # Use Playwright for JavaScript rendering
+            from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+            
+            async with async_playwright() as p:
+                # Launch browser in headless mode
+                browser = await p.chromium.launch(headless=True)
                 
-                html = await response.text()
-                soup = BeautifulSoup(html, 'lxml')
+                # Create new page with realistic user agent
+                page = await browser.new_page(
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
                 
-                # Strategy 1: Look for "Metin" button and associated text wrapper
-                text_wrapper = soup.find('div', class_='textwrapper')
-                if text_wrapper:
-                    text = text_wrapper.get_text(strip=True, separator=' ')
-                    logger.info(f"Extracted {len(text)} characters from textwrapper")
-                    return text
-                
-                # Strategy 2: Look for common article containers
-                article_selectors = [
-                    ('article', {}),
-                    ('div', {'class': 'article-content'}),
-                    ('div', {'class': 'news-content'}),
-                    ('div', {'class': 'content'}),
-                    ('div', {'id': 'article-body'}),
-                ]
-                
-                for tag, attrs in article_selectors:
-                    element = soup.find(tag, attrs)
-                    if element:
-                        text = element.get_text(strip=True, separator=' ')
-                        logger.info(f"Extracted {len(text)} characters from {tag}")
+                try:
+                    # Navigate to page with timeout
+                    await page.goto(url, wait_until='networkidle', timeout=TIMEOUT * 1000)
+                    
+                    # Wait for content to load
+                    await page.wait_for_timeout(2000)
+                    
+                    # Get page content
+                    html_content = await page.content()
+                    
+                    # Parse with BeautifulSoup
+                    soup = BeautifulSoup(html_content, 'lxml')
+                    
+                    # Remove script and style elements
+                    for script in soup(["script", "style", "noscript"]):
+                        script.decompose()
+                    
+                    # Strategy 1: Look for "textwrapper" or similar content divs
+                    text_wrapper = soup.find('div', class_='textwrapper')
+                    if text_wrapper:
+                        text = text_wrapper.get_text(strip=True, separator=' ')
+                        await browser.close()
+                        logger.info(f"Extracted {len(text)} characters from textwrapper")
                         return text
-                
-                # Strategy 3: Look for multiple paragraphs
-                paragraphs = soup.find_all('p')
-                if len(paragraphs) >= 3:
-                    text = ' '.join([p.get_text(strip=True) for p in paragraphs])
-                    logger.info(f"Extracted {len(text)} characters from paragraphs")
-                    return text
-                
-                logger.warning(f"Could not find news text in {gno_url}")
-                return None
-                
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout while fetching {gno_url}")
-            return None
+                    
+                    # Strategy 2: Look for article tag
+                    article = soup.find('article')
+                    if article:
+                        text = article.get_text(strip=True, separator=' ')
+                        await browser.close()
+                        logger.info(f"Extracted {len(text)} characters from article")
+                        return text
+                    
+                    # Strategy 3: Look for common content containers
+                    content_selectors = [
+                        ('div', {'class': 'article-content'}),
+                        ('div', {'class': 'news-content'}),
+                        ('div', {'class': 'content'}),
+                        ('div', {'id': 'article-body'}),
+                        ('div', {'class': 'story-body'}),
+                    ]
+                    
+                    for tag, attrs in content_selectors:
+                        element = soup.find(tag, attrs)
+                        if element:
+                            text = element.get_text(strip=True, separator=' ')
+                            if len(text) > 100:  # Minimum text length
+                                await browser.close()
+                                logger.info(f"Extracted {len(text)} characters from {tag}")
+                                return text
+                    
+                    # Strategy 4: Get all text from body
+                    body = soup.find('body')
+                    if body:
+                        text = body.get_text(separator='\\n', strip=True)
+                        # Clean up multiple newlines
+                        lines = [line.strip() for line in text.splitlines() if line.strip()]
+                        clean_text = ' '.join(lines)
+                        
+                        await browser.close()
+                        
+                        if len(clean_text) > 200:
+                            logger.info(f"Extracted {len(clean_text)} characters from body")
+                            return clean_text
+                    
+                    await browser.close()
+                    logger.warning(f"Could not find sufficient text in {url}")
+                    return None
+                    
+                except PlaywrightTimeoutError:
+                    logger.error(f"Timeout while loading {url}")
+                    await browser.close()
+                    return None
+                except Exception as e:
+                    logger.error(f"Error during page interaction: {str(e)}")
+                    await browser.close()
+                    return None
+                    
         except Exception as e:
             logger.error(f"Error extracting news from {gno_url}: {str(e)}")
             return None
