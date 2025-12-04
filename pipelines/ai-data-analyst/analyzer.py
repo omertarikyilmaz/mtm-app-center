@@ -174,8 +174,22 @@ class NewsAnalyzer:
         Returns:
             List of brand information dictionaries
         """
-        logger.info(f"[BRANDS] Starting analysis on {len(news_text)} characters")
-        logger.info(f"[BRANDS] Text sample: {news_text[:150]}...")
+        # Sanitize text - remove problematic Unicode symbols (emojis, checkmarks, etc.)
+        # but keep Turkish characters (ğüşıöçĞÜŞİÖÇ)
+        import unicodedata
+        def clean_char(c):
+            cat = unicodedata.category(c)
+            # Keep letters, numbers, punctuation, spaces
+            if cat.startswith('L') or cat.startswith('N') or cat.startswith('P') or cat.startswith('Z'):
+                return c
+            # Remove symbols and other problematic chars
+            return ' '
+        clean_text = ''.join(clean_char(c) for c in news_text)
+        # Normalize whitespace
+        clean_text = ' '.join(clean_text.split())
+        
+        logger.info(f"[BRANDS] Starting analysis on {len(clean_text)} characters")
+        logger.info(f"[BRANDS] Text sample: {clean_text[:150]}...")
         
         for attempt in range(MAX_RETRIES):
             try:
@@ -191,7 +205,7 @@ class NewsAnalyzer:
                         },
                         {
                             "role": "user",
-                            "content": BRAND_EXTRACTION_PROMPT.format(news_text=news_text)
+                            "content": BRAND_EXTRACTION_PROMPT.format(news_text=clean_text)
                         }
                     ],
                     temperature=0.3,
