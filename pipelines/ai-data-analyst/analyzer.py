@@ -80,6 +80,19 @@ class NewsAnalyzer:
                     # Wait for content to load
                     await page.wait_for_timeout(2000)
                     
+                    # Look for "Metin" button and click it to reveal text
+                    try:
+                        # Try to find and click the Metin button
+                        metin_button = await page.query_selector('button:has-text("Metin"), a:has-text("Metin")')
+                        if metin_button:
+                            logger.info("Found Metin button, clicking...")
+                            await metin_button.click()
+                            # Wait for text to load
+                            await page.wait_for_timeout(2000)
+                            logger.info("Clicked Metin button successfully")
+                    except Exception as e:
+                        logger.warning(f"Could not click Metin button: {str(e)}")
+                    
                     # Get page content
                     html_content = await page.content()
                     
@@ -90,12 +103,12 @@ class NewsAnalyzer:
                     for script in soup(["script", "style", "noscript"]):
                         script.decompose()
                     
-                    # Strategy 1: Look for "textwrapper" or similar content divs
-                    text_wrapper = soup.find('div', class_='textwrapper')
+                    # Strategy 1: Look for "text-wrapper" (medyatakip.com uses this)
+                    text_wrapper = soup.find('div', class_='text-wrapper')
                     if text_wrapper:
                         text = text_wrapper.get_text(strip=True, separator=' ')
                         await browser.close()
-                        logger.info(f"Extracted {len(text)} characters from textwrapper")
+                        logger.info(f"Extracted {len(text)} characters from text-wrapper")
                         return text
                     
                     # Strategy 2: Look for article tag
