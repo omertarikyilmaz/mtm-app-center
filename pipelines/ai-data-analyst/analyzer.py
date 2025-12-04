@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from prompts import BRAND_EXTRACTION_PROMPT, SENTIMENT_ANALYSIS_PROMPT
 
@@ -27,7 +27,7 @@ class NewsAnalyzer:
     """Handles news extraction and analysis"""
     
     def __init__(self, api_key: str, model: str = "gpt-4-turbo-preview"):
-        self.client = OpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
         self.session = None
         
@@ -173,43 +173,59 @@ class NewsAnalyzer:
         Returns:
             List of brand information dictionaries
         """
+        logger.info(f"[BRANDS] Starting analysis on {len(news_text)} characters of text")
+        logger.info(f"[BRANDS] Text sample: {news_text[:200]}...")
+        
         for attempt in range(MAX_RETRIES):
             try:
                 logger.info(f"[BRANDS] Attempt {attempt + 1}/{MAX_RETRIES}")
                 
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "Sen bir veri analisti uzmanısın. Yanıtların sadece geçerli JSON içermelidir."
-                        },
-                        {
-                            "role": "user",
-                            "content": BRAND_EXTRACTION_PROMPT.format(news_text=news_text)
-                        }
-                    ],
-                    temperature=0.3,
-                    max_tokens=1500,
-                    response_format={"type": "json_object"}
-                )
-                
-                content = response.choices[0].message.content.strip()
-                logger.info(f"[BRANDS] Response: {content[:200]}...")
+                try:
+                    response = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "Sen bir veri analisti uzmanısın. Yanıtların sadece geçerli JSON içermelidir."
+                            },
+                            {
+                                "role": "user",
+                                "content": BRAND_EXTRACTION_PROMPT.format(news_text=news_text)
+                            }
+                        ],
+                        temperature=0.3,
+                        max_tokens=1500,
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    content = response.choices[0].message.content.strip()
+                    logger.info(f"[BRANDS] Full OpenAI response:\n{content}")
+                    
+                except Exception as api_error:
+                    logger.error(f"[BRANDS] OpenAI API error: {type(api_error).__name__}: {str(api_error)}")
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(2)
+                        continue
+                    return []
                 
                 # Try to parse as JSON
                 try:
                     result = json.loads(content)
+                    logger.info(f"[BRANDS] Parsed JSON type: {type(result)}")
                     
                     # Handle various response structures
                     if isinstance(result, list):
                         brands = result
+                        logger.info(f"[BRANDS] Direct list with {len(brands)} items")
                     elif isinstance(result, dict):
+                        logger.info(f"[BRANDS] Dict with keys: {list(result.keys())}")
                         # Try to find array inside dict
                         if 'brands' in result:
                             brands = result['brands']
+                            logger.info(f"[BRANDS] Found 'brands' key with {len(brands)} items")
                         elif 'markalar' in result:
                             brands = result['markalar']
+                            logger.info(f"[BRANDS] Found 'markalar' key with {len(brands)} items")
                         else:
                             # Get first list value
                             for key, value in result.items():
@@ -273,7 +289,7 @@ class NewsAnalyzer:
             try:
                 logger.info(f"Analyzing sentiment for '{brand_name}' (attempt {attempt + 1}/{MAX_RETRIES})")
                 
-                response = self.client.chat.completions.create(
+                response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {
