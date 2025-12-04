@@ -6,7 +6,6 @@ import re
 import asyncio
 import logging
 from typing import List, Dict, Optional
-import time
 from urllib.parse import urljoin
 
 import aiohttp
@@ -200,7 +199,7 @@ class NewsAnalyzer:
                 except Exception as api_error:
                     logger.error(f"[BRANDS] OpenAI API error: {type(api_error).__name__}: {str(api_error)}")
                     if attempt < MAX_RETRIES - 1:
-                        time.sleep(2)
+                        await asyncio.sleep(2)
                         continue
                     return []
                 
@@ -241,7 +240,7 @@ class NewsAnalyzer:
                     else:
                         logger.warning("[BRANDS] Empty result")
                         if attempt < MAX_RETRIES - 1:
-                            time.sleep(1)
+                            await asyncio.sleep(1)
                             continue
                         return []
                 except json.JSONDecodeError:
@@ -257,14 +256,14 @@ class NewsAnalyzer:
                     
                     logger.error(f"Could not parse JSON from response: {content}")
                     if attempt < MAX_RETRIES - 1:
-                        time.sleep(1)
+                        await asyncio.sleep(1)
                         continue
                     return []
                     
             except Exception as e:
                 logger.error(f"Error analyzing brands: {str(e)}")
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                     continue
                 return []
         
@@ -324,7 +323,7 @@ class NewsAnalyzer:
                     
                     logger.error(f"Could not parse JSON from response: {content}")
                     if attempt < MAX_RETRIES - 1:
-                        time.sleep(1)
+                        await asyncio.sleep(1)
                         continue
                     return {
                         "sentiment": "Nötr",
@@ -335,7 +334,7 @@ class NewsAnalyzer:
             except Exception as e:
                 logger.error(f"Error analyzing sentiment: {str(e)}")
                 if attempt < MAX_RETRIES - 1:
-                    time.sleep(1)
+                    await asyncio.sleep(1)
                     continue
                 return {
                     "sentiment": "Nötr",
