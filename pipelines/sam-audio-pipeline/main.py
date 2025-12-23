@@ -45,8 +45,8 @@ RESULTS_DIR = Path("/tmp/sam-audio/results")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Default prompt for news anchor voice
-DEFAULT_PROMPT = "A news anchor speaking"
+# Default prompt - isolate music and ads so residual audio contains news content
+DEFAULT_PROMPT = "Background music, jingles, and advertisement sounds"
 
 
 @app.get("/health")
