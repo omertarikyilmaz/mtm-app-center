@@ -19,7 +19,7 @@ from pydub import AudioSegment
 logger = logging.getLogger(__name__)
 
 # Constants
-CHUNK_DURATION_SECONDS = 60  # 60 seconds per chunk for better performance
+CHUNK_DURATION_SECONDS = 45  # 45 seconds - balanced for 24GB VRAM
 SAMPLE_RATE = 16000  # SAM-Audio uses 16kHz
 MAX_AUDIO_DURATION = 65 * 60  # 65 minutes in seconds
 
