@@ -15,6 +15,7 @@ import numpy as np
 import torch
 import torchaudio
 from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,81 @@ logger = logging.getLogger(__name__)
 CHUNK_DURATION_SECONDS = 45  # 45 seconds - balanced for 24GB VRAM
 SAMPLE_RATE = 16000  # SAM-Audio uses 16kHz
 MAX_AUDIO_DURATION = 65 * 60  # 65 minutes in seconds
+
+# Silence detection settings
+SILENCE_THRESH_DB = -40  # dB threshold for silence detection
+MIN_SILENCE_LEN_MS = 500  # Minimum silence length to be considered (ms)
+MIN_SPEECH_LEN_MS = 1000  # Minimum speech segment length to keep (ms)
+GAP_BETWEEN_SEGMENTS_MS = 3000  # 3 seconds gap between segments
+
+
+def remove_silence_and_concatenate(
+    audio: AudioSegment,
+    silence_thresh: int = SILENCE_THRESH_DB,
+    min_silence_len: int = MIN_SILENCE_LEN_MS,
+    min_speech_len: int = MIN_SPEECH_LEN_MS,
+    gap_duration: int = GAP_BETWEEN_SEGMENTS_MS
+) -> AudioSegment:
+    """
+    Remove silent parts from audio and concatenate non-silent segments with gaps.
+    
+    Args:
+        audio: Input audio segment
+        silence_thresh: Silence threshold in dB
+        min_silence_len: Minimum silence length to split on (ms)
+        min_speech_len: Minimum speech segment length to keep (ms)
+        gap_duration: Duration of silence gap between segments (ms)
+        
+    Returns:
+        Cleaned audio with silent parts removed and segments concatenated
+    """
+    logger.info(f"Detecting non-silent segments (threshold: {silence_thresh}dB)...")
+    
+    # Detect non-silent segments
+    nonsilent_ranges = detect_nonsilent(
+        audio,
+        min_silence_len=min_silence_len,
+        silence_thresh=silence_thresh
+    )
+    
+    if not nonsilent_ranges:
+        logger.warning("No non-silent segments found!")
+        return audio
+    
+    logger.info(f"Found {len(nonsilent_ranges)} non-silent segments")
+    
+    # Create gap audio
+    gap = AudioSegment.silent(duration=gap_duration)
+    
+    # Extract and concatenate non-silent segments
+    result = AudioSegment.empty()
+    segments_kept = 0
+    
+    for i, (start_ms, end_ms) in enumerate(nonsilent_ranges):
+        segment_duration = end_ms - start_ms
+        
+        # Skip very short segments (likely noise)
+        if segment_duration < min_speech_len:
+            logger.debug(f"Skipping short segment {i+1}: {segment_duration}ms")
+            continue
+        
+        segment = audio[start_ms:end_ms]
+        
+        if len(result) > 0:
+            result += gap
+        
+        result += segment
+        segments_kept += 1
+        
+        logger.debug(f"Kept segment {i+1}: {start_ms/1000:.1f}s - {end_ms/1000:.1f}s ({segment_duration/1000:.1f}s)")
+    
+    original_duration = len(audio) / 1000
+    result_duration = len(result) / 1000
+    reduction = (1 - result_duration / original_duration) * 100
+    
+    logger.info(f"Silence removal: {original_duration:.1f}s → {result_duration:.1f}s ({reduction:.1f}% reduced, {segments_kept} segments)")
+    
+    return result
 
 
 class SAMAudioProcessor:
@@ -186,18 +262,20 @@ class SAMAudioProcessor:
         self, 
         audio_path: Path, 
         prompt: str,
-        progress_callback: Optional[callable] = None
-    ) -> Tuple[Path, Path, Path]:
+        progress_callback: Optional[callable] = None,
+        remove_silence: bool = True
+    ) -> Tuple[Path, Path, Path, Optional[Path]]:
         """
-        Full separation pipeline: chunk → process → merge → save
+        Full separation pipeline: chunk → process → merge → remove silence → save
         
         Args:
             audio_path: Path to input audio file
             prompt: Text description of sound to isolate
             progress_callback: Optional callback(current, total, message)
+            remove_silence: Whether to create a cleaned version with silence removed
             
         Returns:
-            Tuple of paths: (original_path, target_path, residual_path)
+            Tuple of paths: (original_path, target_path, residual_path, cleaned_path)
         """
         # Ensure model is loaded
         await self.load_model()
@@ -217,7 +295,7 @@ class SAMAudioProcessor:
         for i, (chunk_path, start, end) in enumerate(chunks_info):
             if progress_callback:
                 progress_callback(
-                    int((i / num_chunks) * 80) + 10, 
+                    int((i / num_chunks) * 70) + 10, 
                     100, 
                     f"Processing chunk {i+1}/{num_chunks} ({start:.1f}s - {end:.1f}s)"
                 )
@@ -233,7 +311,7 @@ class SAMAudioProcessor:
         
         # Step 3: Merge chunks
         if progress_callback:
-            progress_callback(90, 100, "Merging chunks...")
+            progress_callback(80, 100, "Merging chunks...")
             
         merged_target, merged_residual = self.merge_chunks(processed_chunks)
         
@@ -252,24 +330,46 @@ class SAMAudioProcessor:
         
         # Step 5: Save outputs
         if progress_callback:
-            progress_callback(95, 100, "Saving results...")
+            progress_callback(85, 100, "Saving results...")
         
         sr = self.processor.audio_sampling_rate
         
         original_path = output_dir / "original.wav"
         target_path = output_dir / "isolated.wav"
         residual_path = output_dir / "residual.wav"
+        cleaned_path = None
         
         torchaudio.save(str(original_path), original_waveform, sr)
         torchaudio.save(str(target_path), merged_target.unsqueeze(0), sr)
         torchaudio.save(str(residual_path), merged_residual.unsqueeze(0), sr)
+        
+        # Step 6: Remove silence from residual (news content) if requested
+        if remove_silence:
+            if progress_callback:
+                progress_callback(90, 100, "Removing silence from news content...")
+            
+            try:
+                # Load residual as pydub AudioSegment
+                residual_audio = AudioSegment.from_wav(str(residual_path))
+                
+                # Remove silence and concatenate with gaps
+                cleaned_audio = remove_silence_and_concatenate(residual_audio)
+                
+                # Save cleaned version
+                cleaned_path = output_dir / "cleaned.wav"
+                cleaned_audio.export(str(cleaned_path), format="wav")
+                
+                logger.info(f"Cleaned audio saved: {cleaned_path}")
+            except Exception as e:
+                logger.error(f"Failed to remove silence: {str(e)}")
+                cleaned_path = None
         
         if progress_callback:
             progress_callback(100, 100, "Complete!")
         
         logger.info(f"Separation complete. Output directory: {output_dir}")
         
-        return original_path, target_path, residual_path
+        return original_path, target_path, residual_path, cleaned_path
 
 
 # Singleton instance for reuse

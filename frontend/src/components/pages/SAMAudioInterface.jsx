@@ -11,7 +11,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Upload, Loader2, AlertCircle, CheckCircle, Download, Play, Pause, Volume2, VolumeX, Music, Square } from 'lucide-react'
 
-const DEFAULT_PROMPT = "Background music, jingles, and advertisement sounds"
+const DEFAULT_PROMPT = "Background music, instrumental music, jingles, sound effects, radio ads, TV commercials, and advertisement audio"
 
 // WaveformVisualizer Component - Canvas-based waveform rendering
 function WaveformVisualizer({ analyserNode, isPlaying, color, height = 60 }) {
@@ -592,7 +592,8 @@ export default function SAMAudioInterface() {
     const tracks = [
         { key: 'original', label: 'Orijinal Ses', color: '#06b6d4' },
         { key: 'isolated', label: 'Müzik & Reklamlar (Çıkarılan)', color: '#ec4899' },
-        { key: 'residual', label: 'Haber İçeriği (Temiz)', color: '#10b981' }
+        { key: 'residual', label: 'Haber İçeriği (Ham)', color: '#8b5cf6' },
+        { key: 'cleaned', label: 'Haber İçeriği (Temizlenmiş)', color: '#10b981' }
     ]
 
     return (

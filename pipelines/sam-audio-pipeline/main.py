@@ -2,7 +2,7 @@
 FastAPI application for SAM-Audio Source Separation Pipeline
 
 Provides endpoints for uploading audio, processing with SAM-Audio,
-and downloading separated audio tracks (original, isolated, residual).
+and downloading separated audio tracks (original, isolated, residual, cleaned).
 """
 import asyncio
 import os
@@ -45,8 +45,9 @@ RESULTS_DIR = Path("/tmp/sam-audio/results")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Default prompt - isolate music and ads so residual audio contains news content
-DEFAULT_PROMPT = "Background music, jingles, and advertisement sounds"
+# Improved prompt - removes ALL music, jingles, sound effects, and ads
+# This ensures residual audio contains ONLY spoken news content
+DEFAULT_PROMPT = "Background music, instrumental music, jingles, sound effects, radio ads, TV commercials, and advertisement audio"
 
 
 @app.get("/health")
@@ -77,7 +78,7 @@ async def start_separation(
     
     Args:
         file: Audio file (WAV, MP3, etc.) - max 65 minutes
-        prompt: Text description of sound to isolate (default: "A news anchor speaking")
+        prompt: Text description of sound to isolate/remove
         
     Returns:
         Task ID for tracking progress
@@ -118,6 +119,7 @@ async def start_separation(
         "original_path": None,
         "isolated_path": None,
         "residual_path": None,
+        "cleaned_path": None,
         "error": None
     }
     
@@ -174,6 +176,9 @@ async def get_task_status(task_id: str):
             "isolated": f"/api/v1/pipelines/sam-audio/download/{task_id}/isolated",
             "residual": f"/api/v1/pipelines/sam-audio/download/{task_id}/residual"
         }
+        # Add cleaned track if available
+        if task.get("cleaned_path"):
+            response["downloads"]["cleaned"] = f"/api/v1/pipelines/sam-audio/download/{task_id}/cleaned"
         response["completed_at"] = task.get("completed_at")
     
     return response
@@ -186,7 +191,7 @@ async def download_track(task_id: str, track_type: str):
     
     Args:
         task_id: Task ID from separate endpoint
-        track_type: One of "original", "isolated", "residual"
+        track_type: One of "original", "isolated", "residual", "cleaned"
         
     Returns:
         Audio file (WAV format)
@@ -206,7 +211,8 @@ async def download_track(task_id: str, track_type: str):
     path_map = {
         "original": task["original_path"],
         "isolated": task["isolated_path"],
-        "residual": task["residual_path"]
+        "residual": task["residual_path"],
+        "cleaned": task.get("cleaned_path")
     }
     
     if track_type not in path_map:
@@ -256,11 +262,12 @@ async def process_audio_task(
         # Get processor
         processor = get_processor()
         
-        # Run separation
-        original_path, isolated_path, residual_path = await processor.separate(
+        # Run separation with silence removal enabled
+        original_path, isolated_path, residual_path, cleaned_path = await processor.separate(
             audio_path=input_file,
             prompt=prompt,
-            progress_callback=update_progress
+            progress_callback=update_progress,
+            remove_silence=True
         )
         
         # Move results to permanent location
@@ -272,6 +279,12 @@ async def process_audio_task(
         shutil.move(str(isolated_path), str(final_isolated))
         shutil.move(str(residual_path), str(final_residual))
         
+        # Move cleaned file if it exists
+        final_cleaned = None
+        if cleaned_path and cleaned_path.exists():
+            final_cleaned = result_dir / "cleaned.wav"
+            shutil.move(str(cleaned_path), str(final_cleaned))
+        
         # Clean up temp directory
         original_path.parent.rmdir()
         
@@ -282,6 +295,7 @@ async def process_audio_task(
         TASKS[task_id]["original_path"] = str(final_original)
         TASKS[task_id]["isolated_path"] = str(final_isolated)
         TASKS[task_id]["residual_path"] = str(final_residual)
+        TASKS[task_id]["cleaned_path"] = str(final_cleaned) if final_cleaned else None
         TASKS[task_id]["completed_at"] = datetime.now().isoformat()
         
         logger.info(f"Task {task_id} completed successfully")
