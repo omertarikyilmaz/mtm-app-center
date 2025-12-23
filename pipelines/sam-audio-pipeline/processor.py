@@ -29,6 +29,8 @@ SILENCE_THRESH_DB = -40  # dB threshold for silence detection
 MIN_SILENCE_LEN_MS = 500  # Minimum silence length to be considered (ms)
 MIN_SPEECH_LEN_MS = 1000  # Minimum speech segment length to keep (ms)
 GAP_BETWEEN_SEGMENTS_MS = 1000  # 1 second gap between segments
+SEGMENT_PADDING_MS = 100  # Padding to add before/after each segment
+CHUNK_OVERLAP_SECONDS = 5  # Overlap between chunks to prevent word cutting
 
 def remove_silence_and_concatenate(
     audio: AudioSegment,
@@ -92,10 +94,11 @@ def remove_silence_and_concatenate(
     
     logger.info(f"After merging consecutive segments: {len(merged_ranges)} segments")
     
-    # Step 2: Filter out short segments and concatenate with gaps
+    # Step 2: Filter out short segments, add padding, and concatenate with gaps
     gap = AudioSegment.silent(duration=gap_duration)
     result = AudioSegment.empty()
     segments_kept = 0
+    audio_duration_ms = len(audio)
     
     for i, (start_ms, end_ms) in enumerate(merged_ranges):
         segment_duration = end_ms - start_ms
@@ -105,7 +108,11 @@ def remove_silence_and_concatenate(
             logger.debug(f"Skipping short segment {i+1}: {segment_duration}ms")
             continue
         
-        segment = audio[start_ms:end_ms]
+        # Add padding to preserve word boundaries (100ms before and after)
+        padded_start = max(0, start_ms - SEGMENT_PADDING_MS)
+        padded_end = min(audio_duration_ms, end_ms + SEGMENT_PADDING_MS)
+        
+        segment = audio[padded_start:padded_end]
         
         # Only add gap between segments, not at the start
         if len(result) > 0:
@@ -114,7 +121,7 @@ def remove_silence_and_concatenate(
         result += segment
         segments_kept += 1
         
-        logger.debug(f"Kept segment {i+1}: {start_ms/1000:.1f}s - {end_ms/1000:.1f}s ({segment_duration/1000:.1f}s)")
+        logger.debug(f"Kept segment {i+1}: {padded_start/1000:.1f}s - {padded_end/1000:.1f}s (padded from {start_ms/1000:.1f}s-{end_ms/1000:.1f}s)")
     
     original_duration = len(audio) / 1000
     result_duration = len(result) / 1000
@@ -168,16 +175,23 @@ class SAMAudioProcessor:
             logger.error(f"Failed to load model: {str(e)}")
             raise RuntimeError(f"Could not load SAM-Audio model: {str(e)}")
     
-    def chunk_audio(self, audio_path: Path, chunk_duration: int = CHUNK_DURATION_SECONDS) -> List[Tuple[Path, float, float]]:
+    def chunk_audio(
+        self, 
+        audio_path: Path, 
+        chunk_duration: int = CHUNK_DURATION_SECONDS,
+        overlap: int = CHUNK_OVERLAP_SECONDS
+    ) -> List[Tuple[Path, float, float, float, float]]:
         """
-        Split audio file into smaller chunks for processing
+        Split audio file into overlapping chunks for processing
         
         Args:
             audio_path: Path to input audio file
             chunk_duration: Duration of each chunk in seconds
+            overlap: Overlap between chunks in seconds
             
         Returns:
-            List of tuples: (chunk_path, start_time, end_time)
+            List of tuples: (chunk_path, start_time, end_time, trim_start, trim_end)
+            trim_start/trim_end indicate how much to trim from merged output
         """
         logger.info(f"Chunking audio: {audio_path}")
         
@@ -196,13 +210,22 @@ class SAMAudioProcessor:
         chunks = []
         
         chunk_duration_ms = chunk_duration * 1000
-        num_chunks = int(np.ceil(duration_ms / chunk_duration_ms))
+        overlap_ms = overlap * 1000
+        step_ms = chunk_duration_ms - overlap_ms  # Step size between chunks
         
-        logger.info(f"Splitting into {num_chunks} chunks of {chunk_duration}s each")
+        # Calculate number of chunks
+        num_chunks = max(1, int(np.ceil((duration_ms - overlap_ms) / step_ms)))
+        
+        logger.info(f"Splitting into {num_chunks} chunks of {chunk_duration}s with {overlap}s overlap")
         
         for i in range(num_chunks):
-            start_ms = i * chunk_duration_ms
-            end_ms = min((i + 1) * chunk_duration_ms, duration_ms)
+            start_ms = i * step_ms
+            end_ms = min(start_ms + chunk_duration_ms, duration_ms)
+            
+            # For first chunk, no trim at start; for last chunk, no trim at end
+            # For middle chunks, trim half the overlap from each side when merging
+            trim_start_ms = 0 if i == 0 else overlap_ms // 2
+            trim_end_ms = 0 if i == num_chunks - 1 else overlap_ms // 2
             
             chunk = audio[start_ms:end_ms]
             
@@ -210,9 +233,15 @@ class SAMAudioProcessor:
             chunk_path = chunk_dir / f"chunk_{i:04d}.wav"
             chunk.export(str(chunk_path), format="wav")
             
-            chunks.append((chunk_path, start_ms / 1000, end_ms / 1000))
+            chunks.append((
+                chunk_path, 
+                start_ms / 1000, 
+                end_ms / 1000,
+                trim_start_ms / 1000,
+                trim_end_ms / 1000
+            ))
             
-        logger.info(f"Created {len(chunks)} chunks in {chunk_dir}")
+        logger.info(f"Created {len(chunks)} overlapping chunks in {chunk_dir}")
         return chunks
     
     async def process_chunk(
@@ -253,15 +282,15 @@ class SAMAudioProcessor:
     
     def merge_chunks(
         self, 
-        chunks: List[Tuple[torch.Tensor, torch.Tensor]],
-        crossfade_ms: int = 50
+        chunks: List[Tuple[torch.Tensor, torch.Tensor, float, float]],
+        sample_rate: int = SAMPLE_RATE
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Merge processed chunks back together with crossfade
+        Merge processed chunks back together, trimming overlapping portions
         
         Args:
-            chunks: List of (target, residual) tensor tuples
-            crossfade_ms: Crossfade duration in milliseconds
+            chunks: List of (target, residual, trim_start, trim_end) tuples
+            sample_rate: Sample rate for calculating trim samples
             
         Returns:
             Tuple of (merged_target, merged_residual) tensors
@@ -270,16 +299,34 @@ class SAMAudioProcessor:
             raise ValueError("No chunks to merge")
             
         if len(chunks) == 1:
-            return chunks[0]
+            target, residual, _, _ = chunks[0]
+            return target, residual
         
-        logger.info(f"Merging {len(chunks)} chunks with {crossfade_ms}ms crossfade")
+        logger.info(f"Merging {len(chunks)} chunks with overlap trimming")
         
-        # Simple concatenation (crossfade can be added later for smoother transitions)
-        targets = [c[0] for c in chunks]
-        residuals = [c[1] for c in chunks]
+        trimmed_targets = []
+        trimmed_residuals = []
         
-        merged_target = torch.cat(targets, dim=-1)
-        merged_residual = torch.cat(residuals, dim=-1)
+        for i, (target, residual, trim_start, trim_end) in enumerate(chunks):
+            # Convert trim times to samples
+            trim_start_samples = int(trim_start * sample_rate)
+            trim_end_samples = int(trim_end * sample_rate) if trim_end > 0 else 0
+            
+            # Trim the tensors
+            if trim_end_samples > 0:
+                trimmed_target = target[..., trim_start_samples:-trim_end_samples] if trim_end_samples > 0 else target[..., trim_start_samples:]
+                trimmed_residual = residual[..., trim_start_samples:-trim_end_samples] if trim_end_samples > 0 else residual[..., trim_start_samples:]
+            else:
+                trimmed_target = target[..., trim_start_samples:]
+                trimmed_residual = residual[..., trim_start_samples:]
+            
+            trimmed_targets.append(trimmed_target)
+            trimmed_residuals.append(trimmed_residual)
+            
+            logger.debug(f"Chunk {i+1}: trimmed {trim_start}s from start, {trim_end}s from end")
+        
+        merged_target = torch.cat(trimmed_targets, dim=-1)
+        merged_residual = torch.cat(trimmed_residuals, dim=-1)
         
         return merged_target, merged_residual
     
@@ -308,16 +355,16 @@ class SAMAudioProcessor:
         # Create output directory
         output_dir = Path(tempfile.mkdtemp(prefix="sam_output_"))
         
-        # Step 1: Chunk the audio
+        # Step 1: Chunk the audio with overlap
         if progress_callback:
-            progress_callback(0, 100, "Chunking audio...")
+            progress_callback(0, 100, "Chunking audio with overlap...")
             
         chunks_info = self.chunk_audio(audio_path)
         num_chunks = len(chunks_info)
         
         # Step 2: Process each chunk
         processed_chunks = []
-        for i, (chunk_path, start, end) in enumerate(chunks_info):
+        for i, (chunk_path, start, end, trim_start, trim_end) in enumerate(chunks_info):
             if progress_callback:
                 progress_callback(
                     int((i / num_chunks) * 70) + 10, 
@@ -326,7 +373,7 @@ class SAMAudioProcessor:
                 )
             
             target, residual = await self.process_chunk(chunk_path, prompt)
-            processed_chunks.append((target, residual))
+            processed_chunks.append((target, residual, trim_start, trim_end))
             
             # Clean up chunk file
             chunk_path.unlink()
