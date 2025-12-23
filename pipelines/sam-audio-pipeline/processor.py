@@ -35,7 +35,7 @@ class SAMAudioProcessor:
         self._loaded = False
         
     async def load_model(self):
-        """Load SAM-Audio model and processor"""
+        """Load SAM-Audio model and processor with memory optimization"""
         if self._loaded:
             return
             
@@ -44,11 +44,24 @@ class SAMAudioProcessor:
         try:
             from sam_audio import SAMAudio, SAMAudioProcessor as SAMProcessor
             
-            self.model = SAMAudio.from_pretrained(self.model_name).to(self.device).eval()
+            # Load model
+            self.model = SAMAudio.from_pretrained(self.model_name)
+            
+            # Disable memory-heavy components (rankers and span predictor)
+            # This reduces VRAM usage from ~24GB to ~10GB
+            # See: https://huggingface.co/facebook/sam-audio-small/discussions
+            logger.info("Disabling rankers and span predictor for memory optimization...")
+            self.model.visual_ranker = None
+            self.model.text_ranker = None
+            self.model.span_predictor = None
+            self.model.span_predictor_transform = None
+            
+            # Move to device and set to eval mode
+            self.model = self.model.to(self.device).eval()
             self.processor = SAMProcessor.from_pretrained(self.model_name)
             self._loaded = True
             
-            logger.info(f"Model loaded successfully on {self.device}")
+            logger.info(f"Model loaded successfully on {self.device} (memory-optimized)")
             
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
@@ -128,7 +141,8 @@ class SAMAudioProcessor:
         ).to(self.device)
         
         with torch.inference_mode():
-            result = self.model.separate(inputs, predict_spans=True)
+            # predict_spans=False to avoid using span predictor (reduces memory)
+            result = self.model.separate(inputs, predict_spans=False)
         
         # Extract tensors
         target = result.target[0].cpu()
