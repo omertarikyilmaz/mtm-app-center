@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
-import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe, Radio, BarChart3 } from 'lucide-react'
+import { Upload, Code, MessageSquare, ScanText, FileText, Loader2, AlertCircle, CheckCircle, Users, HelpCircle, Globe, Radio, BarChart3, Music } from 'lucide-react'
 import './index.css'
 import AIDataAnalyst from './components/pages/AIDataAnalyst'
+import SAMAudioInterface from './components/pages/SAMAudioInterface'
 
 function App() {
     const [currentView, setCurrentView] = useState('dashboard')
@@ -29,6 +30,8 @@ function App() {
                 <RadyoNewsInterface />
             ) : currentView === 'ai-analyst' ? (
                 <AIDataAnalyst />
+            ) : currentView === 'sam-audio' ? (
+                <SAMAudioInterface />
             ) : currentView === 'chat' ? (
                 <ChatInterface />
             ) : null}
@@ -90,6 +93,13 @@ function Dashboard({ onViewChange }) {
             name: 'AI Data Analyst',
             description: 'Haber linklerinden marka ve sentiment analizi yapar, Excel dosyası olarak döndürür.',
             icon: <BarChart3 size={32} color="#10b981" />,
+            status: 'Yeni'
+        },
+        {
+            id: 'sam-audio',
+            name: 'SAM-Audio Separation',
+            description: 'Radyo kayıtlarından haber spikeri sesini izole eder. Meta SAM-Audio ile ses ayrıştırma.',
+            icon: <Music size={32} color="#a855f7" />,
             status: 'Yeni'
         },
         {

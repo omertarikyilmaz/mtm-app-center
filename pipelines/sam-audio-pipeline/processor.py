@@ -1,0 +1,271 @@
+"""
+SAM-Audio Pipeline - Audio Source Separation using Meta's SAM-Audio Model
+
+This module provides audio chunking and processing capabilities for
+separating specific sounds from audio mixtures using text prompts.
+"""
+import os
+import asyncio
+import logging
+import tempfile
+from pathlib import Path
+from typing import List, Tuple, Optional
+import numpy as np
+
+import torch
+import torchaudio
+from pydub import AudioSegment
+
+logger = logging.getLogger(__name__)
+
+# Constants
+CHUNK_DURATION_SECONDS = 30
+SAMPLE_RATE = 16000  # SAM-Audio uses 16kHz
+MAX_AUDIO_DURATION = 65 * 60  # 65 minutes in seconds
+
+
+class SAMAudioProcessor:
+    """Handles audio chunking and SAM-Audio model inference"""
+    
+    def __init__(self, model_name: str = "facebook/sam-audio-small"):
+        self.model_name = model_name
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = None
+        self.processor = None
+        self._loaded = False
+        
+    async def load_model(self):
+        """Load SAM-Audio model and processor"""
+        if self._loaded:
+            return
+            
+        logger.info(f"Loading SAM-Audio model: {self.model_name}")
+        
+        try:
+            from sam_audio import SAMAudio, SAMAudioProcessor as SAMProcessor
+            
+            self.model = SAMAudio.from_pretrained(self.model_name).to(self.device).eval()
+            self.processor = SAMProcessor.from_pretrained(self.model_name)
+            self._loaded = True
+            
+            logger.info(f"Model loaded successfully on {self.device}")
+            
+        except Exception as e:
+            logger.error(f"Failed to load model: {str(e)}")
+            raise RuntimeError(f"Could not load SAM-Audio model: {str(e)}")
+    
+    def chunk_audio(self, audio_path: Path, chunk_duration: int = CHUNK_DURATION_SECONDS) -> List[Tuple[Path, float, float]]:
+        """
+        Split audio file into smaller chunks for processing
+        
+        Args:
+            audio_path: Path to input audio file
+            chunk_duration: Duration of each chunk in seconds
+            
+        Returns:
+            List of tuples: (chunk_path, start_time, end_time)
+        """
+        logger.info(f"Chunking audio: {audio_path}")
+        
+        # Load audio using pydub (handles various formats)
+        audio = AudioSegment.from_file(str(audio_path))
+        duration_ms = len(audio)
+        duration_sec = duration_ms / 1000
+        
+        if duration_sec > MAX_AUDIO_DURATION:
+            raise ValueError(f"Audio too long: {duration_sec:.1f}s (max: {MAX_AUDIO_DURATION}s)")
+        
+        logger.info(f"Audio duration: {duration_sec:.1f} seconds")
+        
+        # Create temporary directory for chunks
+        chunk_dir = Path(tempfile.mkdtemp(prefix="sam_chunks_"))
+        chunks = []
+        
+        chunk_duration_ms = chunk_duration * 1000
+        num_chunks = int(np.ceil(duration_ms / chunk_duration_ms))
+        
+        logger.info(f"Splitting into {num_chunks} chunks of {chunk_duration}s each")
+        
+        for i in range(num_chunks):
+            start_ms = i * chunk_duration_ms
+            end_ms = min((i + 1) * chunk_duration_ms, duration_ms)
+            
+            chunk = audio[start_ms:end_ms]
+            
+            # Export as WAV (SAM-Audio format)
+            chunk_path = chunk_dir / f"chunk_{i:04d}.wav"
+            chunk.export(str(chunk_path), format="wav")
+            
+            chunks.append((chunk_path, start_ms / 1000, end_ms / 1000))
+            
+        logger.info(f"Created {len(chunks)} chunks in {chunk_dir}")
+        return chunks
+    
+    async def process_chunk(
+        self, 
+        chunk_path: Path, 
+        prompt: str
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Process a single audio chunk with SAM-Audio
+        
+        Args:
+            chunk_path: Path to audio chunk
+            prompt: Text description of sound to isolate
+            
+        Returns:
+            Tuple of (target_audio, residual_audio) tensors
+        """
+        if not self._loaded:
+            await self.load_model()
+        
+        logger.info(f"Processing chunk: {chunk_path.name} with prompt: '{prompt}'")
+        
+        # Process with SAM-Audio
+        inputs = self.processor(
+            audios=[str(chunk_path)], 
+            descriptions=[prompt]
+        ).to(self.device)
+        
+        with torch.inference_mode():
+            result = self.model.separate(inputs, predict_spans=True)
+        
+        # Extract tensors
+        target = result.target[0].cpu()
+        residual = result.residual[0].cpu()
+        
+        return target, residual
+    
+    def merge_chunks(
+        self, 
+        chunks: List[Tuple[torch.Tensor, torch.Tensor]],
+        crossfade_ms: int = 50
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Merge processed chunks back together with crossfade
+        
+        Args:
+            chunks: List of (target, residual) tensor tuples
+            crossfade_ms: Crossfade duration in milliseconds
+            
+        Returns:
+            Tuple of (merged_target, merged_residual) tensors
+        """
+        if not chunks:
+            raise ValueError("No chunks to merge")
+            
+        if len(chunks) == 1:
+            return chunks[0]
+        
+        logger.info(f"Merging {len(chunks)} chunks with {crossfade_ms}ms crossfade")
+        
+        # Simple concatenation (crossfade can be added later for smoother transitions)
+        targets = [c[0] for c in chunks]
+        residuals = [c[1] for c in chunks]
+        
+        merged_target = torch.cat(targets, dim=-1)
+        merged_residual = torch.cat(residuals, dim=-1)
+        
+        return merged_target, merged_residual
+    
+    async def separate(
+        self, 
+        audio_path: Path, 
+        prompt: str,
+        progress_callback: Optional[callable] = None
+    ) -> Tuple[Path, Path, Path]:
+        """
+        Full separation pipeline: chunk → process → merge → save
+        
+        Args:
+            audio_path: Path to input audio file
+            prompt: Text description of sound to isolate
+            progress_callback: Optional callback(current, total, message)
+            
+        Returns:
+            Tuple of paths: (original_path, target_path, residual_path)
+        """
+        # Ensure model is loaded
+        await self.load_model()
+        
+        # Create output directory
+        output_dir = Path(tempfile.mkdtemp(prefix="sam_output_"))
+        
+        # Step 1: Chunk the audio
+        if progress_callback:
+            progress_callback(0, 100, "Chunking audio...")
+            
+        chunks_info = self.chunk_audio(audio_path)
+        num_chunks = len(chunks_info)
+        
+        # Step 2: Process each chunk
+        processed_chunks = []
+        for i, (chunk_path, start, end) in enumerate(chunks_info):
+            if progress_callback:
+                progress_callback(
+                    int((i / num_chunks) * 80) + 10, 
+                    100, 
+                    f"Processing chunk {i+1}/{num_chunks} ({start:.1f}s - {end:.1f}s)"
+                )
+            
+            target, residual = await self.process_chunk(chunk_path, prompt)
+            processed_chunks.append((target, residual))
+            
+            # Clean up chunk file
+            chunk_path.unlink()
+        
+        # Clean up chunk directory
+        chunks_info[0][0].parent.rmdir()
+        
+        # Step 3: Merge chunks
+        if progress_callback:
+            progress_callback(90, 100, "Merging chunks...")
+            
+        merged_target, merged_residual = self.merge_chunks(processed_chunks)
+        
+        # Step 4: Load original for comparison
+        original_waveform, orig_sr = torchaudio.load(str(audio_path))
+        if orig_sr != self.processor.audio_sampling_rate:
+            original_waveform = torchaudio.functional.resample(
+                original_waveform, orig_sr, self.processor.audio_sampling_rate
+            )
+        
+        # Make mono if stereo
+        if original_waveform.shape[0] > 1:
+            original_waveform = original_waveform.mean(dim=0, keepdim=True)
+        else:
+            original_waveform = original_waveform[0:1]
+        
+        # Step 5: Save outputs
+        if progress_callback:
+            progress_callback(95, 100, "Saving results...")
+        
+        sr = self.processor.audio_sampling_rate
+        
+        original_path = output_dir / "original.wav"
+        target_path = output_dir / "isolated.wav"
+        residual_path = output_dir / "residual.wav"
+        
+        torchaudio.save(str(original_path), original_waveform, sr)
+        torchaudio.save(str(target_path), merged_target.unsqueeze(0), sr)
+        torchaudio.save(str(residual_path), merged_residual.unsqueeze(0), sr)
+        
+        if progress_callback:
+            progress_callback(100, 100, "Complete!")
+        
+        logger.info(f"Separation complete. Output directory: {output_dir}")
+        
+        return original_path, target_path, residual_path
+
+
+# Singleton instance for reuse
+_processor_instance: Optional[SAMAudioProcessor] = None
+
+
+def get_processor() -> SAMAudioProcessor:
+    """Get or create SAM-Audio processor instance"""
+    global _processor_instance
+    if _processor_instance is None:
+        model_name = os.getenv("SAM_MODEL", "facebook/sam-audio-small")
+        _processor_instance = SAMAudioProcessor(model_name=model_name)
+    return _processor_instance

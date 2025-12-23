@@ -127,3 +127,24 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     restart: unless-stopped
 
+  # SAM-Audio Pipeline - Audio Source Separation (Meta SAM-Audio)
+  sam-audio-pipeline:
+    build:
+      context: ./pipelines/sam-audio-pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8010:8010"
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - SAM_MODEL=facebook/sam-audio-small
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./.cache/huggingface:/root/.cache/huggingface
+      - /tmp/sam-audio:/tmp/sam-audio
+    restart: unless-stopped
