@@ -343,17 +343,17 @@ class SAMAudioProcessor:
         torchaudio.save(str(target_path), merged_target.unsqueeze(0), sr)
         torchaudio.save(str(residual_path), merged_residual.unsqueeze(0), sr)
         
-        # Step 6: Remove silence from residual (news content) if requested
+        # Step 6: Remove silence from isolated (human voices) if requested
         if remove_silence:
             if progress_callback:
-                progress_callback(90, 100, "Removing silence from news content...")
+                progress_callback(90, 100, "Removing silence from speech content...")
             
             try:
-                # Load residual as pydub AudioSegment
-                residual_audio = AudioSegment.from_wav(str(residual_path))
+                # Load isolated (human voices) as pydub AudioSegment
+                isolated_audio = AudioSegment.from_wav(str(target_path))
                 
                 # Remove silence and concatenate with gaps
-                cleaned_audio = remove_silence_and_concatenate(residual_audio)
+                cleaned_audio = remove_silence_and_concatenate(isolated_audio)
                 
                 # Save cleaned version
                 cleaned_path = output_dir / "cleaned.wav"

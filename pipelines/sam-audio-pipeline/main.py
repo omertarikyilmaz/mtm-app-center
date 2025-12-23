@@ -45,9 +45,9 @@ RESULTS_DIR = Path("/tmp/sam-audio/results")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Improved prompt - removes ALL music, jingles, sound effects, and ads
-# This ensures residual audio contains ONLY spoken news content
-DEFAULT_PROMPT = "Background music, instrumental music, jingles, sound effects, radio ads, TV commercials, and advertisement audio"
+# Default prompt - isolate ALL human speech/voices
+# This captures news anchors, reporters, interviewees, and any spoken content
+DEFAULT_PROMPT = "Human speech, people talking, voices, conversation, and spoken words"
 
 
 @app.get("/health")
