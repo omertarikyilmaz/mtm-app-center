@@ -30,16 +30,18 @@ MIN_SILENCE_LEN_MS = 500  # Minimum silence length to be considered (ms)
 MIN_SPEECH_LEN_MS = 1000  # Minimum speech segment length to keep (ms)
 GAP_BETWEEN_SEGMENTS_MS = 1000  # 1 second gap between segments
 
-
 def remove_silence_and_concatenate(
     audio: AudioSegment,
     silence_thresh: int = SILENCE_THRESH_DB,
     min_silence_len: int = MIN_SILENCE_LEN_MS,
     min_speech_len: int = MIN_SPEECH_LEN_MS,
-    gap_duration: int = GAP_BETWEEN_SEGMENTS_MS
+    gap_duration: int = GAP_BETWEEN_SEGMENTS_MS,
+    merge_threshold_ms: int = 200  # Merge segments if gap is less than this
 ) -> AudioSegment:
     """
     Remove silent parts from audio and concatenate non-silent segments with gaps.
+    Smart merging: if two segments are close together (< merge_threshold_ms apart),
+    they are merged without a gap to prevent cutting words at boundaries.
     
     Args:
         audio: Input audio segment
@@ -47,6 +49,7 @@ def remove_silence_and_concatenate(
         min_silence_len: Minimum silence length to split on (ms)
         min_speech_len: Minimum speech segment length to keep (ms)
         gap_duration: Duration of silence gap between segments (ms)
+        merge_threshold_ms: Merge consecutive segments if gap is less than this
         
     Returns:
         Cleaned audio with silent parts removed and segments concatenated
@@ -64,16 +67,37 @@ def remove_silence_and_concatenate(
         logger.warning("No non-silent segments found!")
         return audio
     
-    logger.info(f"Found {len(nonsilent_ranges)} non-silent segments")
+    logger.info(f"Found {len(nonsilent_ranges)} raw non-silent segments")
     
-    # Create gap audio
+    # Step 1: Merge consecutive segments that are close together
+    # This prevents cutting words that span batch boundaries
+    merged_ranges = []
+    current_start, current_end = nonsilent_ranges[0]
+    
+    for i in range(1, len(nonsilent_ranges)):
+        next_start, next_end = nonsilent_ranges[i]
+        gap_between = next_start - current_end
+        
+        if gap_between <= merge_threshold_ms:
+            # Merge: extend current segment to include the next one
+            current_end = next_end
+            logger.debug(f"Merging segments (gap={gap_between}ms)")
+        else:
+            # Save current merged segment and start a new one
+            merged_ranges.append((current_start, current_end))
+            current_start, current_end = next_start, next_end
+    
+    # Don't forget the last segment
+    merged_ranges.append((current_start, current_end))
+    
+    logger.info(f"After merging consecutive segments: {len(merged_ranges)} segments")
+    
+    # Step 2: Filter out short segments and concatenate with gaps
     gap = AudioSegment.silent(duration=gap_duration)
-    
-    # Extract and concatenate non-silent segments
     result = AudioSegment.empty()
     segments_kept = 0
     
-    for i, (start_ms, end_ms) in enumerate(nonsilent_ranges):
+    for i, (start_ms, end_ms) in enumerate(merged_ranges):
         segment_duration = end_ms - start_ms
         
         # Skip very short segments (likely noise)
@@ -83,6 +107,7 @@ def remove_silence_and_concatenate(
         
         segment = audio[start_ms:end_ms]
         
+        # Only add gap between segments, not at the start
         if len(result) > 0:
             result += gap
         
