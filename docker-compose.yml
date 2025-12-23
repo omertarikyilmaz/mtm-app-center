@@ -1,5 +1,9 @@
 services:
-  # DeepSeek OCR - Model Server (vLLM) - DISABLED TO FREE VRAM FOR SAM
+  # =====================================================
+  # DISABLED SERVICES (profiles: disabled)
+  # =====================================================
+  
+  # DeepSeek OCR - Model Server (vLLM)
   deepseek-ocr-vllm:
     build:
       context: ./deepseek-ocr-service
@@ -15,11 +19,10 @@ services:
               capabilities: [gpu]
     volumes:
       - ./.cache/huggingface:/root/.cache/huggingface
-    # Optimized to 0.45 to share GPU with Hunyuan OCR
     command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8101 --trust-remote-code --gpu-memory-utilization 0.45
     restart: unless-stopped
     profiles:
-      - disabled  # Temporarily disabled to free VRAM for SAM
+      - disabled
 
   # DeepSeek OCR - API Service (FastAPI)
   deepseek-ocr-api:
@@ -33,6 +36,8 @@ services:
     depends_on:
       - deepseek-ocr-vllm
     restart: unless-stopped
+    profiles:
+      - disabled
 
   # İflas OCR Pipeline - API Service (OpenAI + DeepSeek OCR)
   iflas-pipeline-api:
@@ -47,6 +52,8 @@ services:
     depends_on:
       - deepseek-ocr-api
     restart: unless-stopped
+    profiles:
+      - disabled
 
   # MBR Künye Pipeline - API Service (OpenAI + DeepSeek OCR)
   mbr-kunye-pipeline:
@@ -61,6 +68,8 @@ services:
     depends_on:
       - deepseek-ocr-api
     restart: unless-stopped
+    profiles:
+      - disabled
 
   # MBR Künye Web Pipeline - API Service (OpenAI + Web Scraping)
   mbr-kunye-web-pipeline:
@@ -72,8 +81,10 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     restart: unless-stopped
+    profiles:
+      - disabled
 
-  # Local Turkish-Gemma LLM - API Service (DISABLED)
+  # Local Turkish-Gemma LLM - API Service
   local-llm-api:
     build:
       context: ./local-llm-service
@@ -91,19 +102,7 @@ services:
       - ./.cache/huggingface:/root/.cache/huggingface
     restart: unless-stopped
     profiles:
-      - disabled  # This service is disabled by default
-
-  # Frontend - Web UI (React + Nginx)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
-    depends_on:
-      - deepseek-ocr-api
-      - iflas-pipeline-api
-    restart: unless-stopped
+      - disabled
 
   # Radyo News Pipeline - API Service (OpenAI Whisper + GPT)
   radyo-news-pipeline:
@@ -117,6 +116,8 @@ services:
     volumes:
       - /tmp/audio:/tmp/audio
     restart: unless-stopped
+    profiles:
+      - disabled
 
   # AI Data Analyst Pipeline - API Service (OpenAI GPT + Web Scraping)
   ai-data-analyst:
@@ -127,6 +128,21 @@ services:
       - "8009:8009"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    restart: unless-stopped
+    profiles:
+      - disabled
+
+  # =====================================================
+  # ACTIVE SERVICES (SAM-Audio Focus Mode)
+  # =====================================================
+
+  # Frontend - Web UI (React + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
     restart: unless-stopped
 
   # SAM-Audio Pipeline - Audio Source Separation (Meta SAM-Audio)
