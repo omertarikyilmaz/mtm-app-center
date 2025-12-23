@@ -1,5 +1,5 @@
 services:
-  # DeepSeek OCR - Model Server (vLLM)
+  # DeepSeek OCR - Model Server (vLLM) - DISABLED TO FREE VRAM FOR SAM
   deepseek-ocr-vllm:
     build:
       context: ./deepseek-ocr-service
@@ -18,6 +18,8 @@ services:
     # Optimized to 0.45 to share GPU with Hunyuan OCR
     command: vllm serve deepseek-ai/DeepSeek-OCR --logits_processors vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor --no-enable-prefix-caching --mm-processor-cache-gb 0 --port 8101 --trust-remote-code --gpu-memory-utilization 0.45
     restart: unless-stopped
+    profiles:
+      - disabled  # Temporarily disabled to free VRAM for SAM
 
   # DeepSeek OCR - API Service (FastAPI)
   deepseek-ocr-api:
@@ -133,7 +135,7 @@ services:
       context: ./pipelines/sam-audio-pipeline
       dockerfile: Dockerfile
     ports:
-      - "8010:8010"
+      - "8011:8011"
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
       - SAM_MODEL=facebook/sam-audio-small
