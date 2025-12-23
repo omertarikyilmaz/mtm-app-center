@@ -28,7 +28,7 @@ MAX_AUDIO_DURATION = 65 * 60  # 65 minutes in seconds
 SILENCE_THRESH_DB = -40  # dB threshold for silence detection
 MIN_SILENCE_LEN_MS = 500  # Minimum silence length to be considered (ms)
 MIN_SPEECH_LEN_MS = 1000  # Minimum speech segment length to keep (ms)
-GAP_BETWEEN_SEGMENTS_MS = 3000  # 3 seconds gap between segments
+GAP_BETWEEN_SEGMENTS_MS = 1000  # 1 second gap between segments
 
 
 def remove_silence_and_concatenate(
